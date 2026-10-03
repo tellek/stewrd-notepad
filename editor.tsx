@@ -2,7 +2,7 @@
 // extension seam and no markdown language, so this plugin bundles and owns
 // its own CodeMirror 6 instance instead.
 import { useEffect, useRef } from "react";
-import { EditorState, Compartment, Annotation, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, Annotation, Prec, type Extension } from "@codemirror/state";
 import { EditorView, keymap, highlightActiveLine, Decoration, type DecorationSet, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentMore, indentLess, insertNewlineAndIndent } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -115,6 +115,36 @@ const infiniteScroll = ViewPlugin.fromClass(
   },
 );
 
+/** Reports the document position at the top of the viewport on scroll, so the
+ * caller can restore it later (a position survives re-wrapping, pixels don't). */
+function scrollReporter(onPos: () => ((pos: number) => void) | undefined) {
+  return ViewPlugin.fromClass(
+    class {
+      private onScroll = () => {
+        const pos = this.view.lineBlockAtHeight(this.view.scrollDOM.scrollTop).from;
+        onPos()?.(pos);
+      };
+      constructor(private view: EditorView) {
+        view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
+      }
+      destroy() {
+        this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
+      }
+    },
+  );
+}
+
+/** Ctrl+A selects only up to the last non-blank character, leaving out the
+ * trailing padding lines so they aren't copied. */
+function selectTrimmed(view: EditorView): boolean {
+  view.dispatch({ selection: { anchor: 0, head: trimTrailingBlank(view.state.doc.toString()).length }, userEvent: "select" });
+  return true;
+}
+
+export function trimTrailingBlank(text: string): string {
+  return text.trimEnd();
+}
+
 function highlightExtension(palette: Palette): Extension {
   return syntaxHighlighting(
     HighlightStyle.define([
@@ -194,9 +224,11 @@ export interface EditorProps {
   mode: "source" | "live-preview";
   palette: Palette;
   onCheckboxToggle?: (lineNumber: number) => void;
+  initialScrollPos?: number;
+  onScrollPos?: (pos: number) => void;
 }
 
-export function Editor({ value, onChange, mode, palette }: EditorProps) {
+export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos }: EditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
@@ -204,6 +236,8 @@ export function Editor({ value, onChange, mode, palette }: EditorProps) {
   const modeCompartment = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onScrollPosRef = useRef(onScrollPos);
+  onScrollPosRef.current = onScrollPos;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -222,6 +256,8 @@ export function Editor({ value, onChange, mode, palette }: EditorProps) {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         listNestingKeymap,
+        Prec.high(keymap.of([{ key: "Mod-a", run: selectTrimmed }])),
+        scrollReporter(() => onScrollPosRef.current),
         markdown({ base: markdownLanguage, codeLanguages: CODE_LANGUAGES }),
         highlightActiveLine(),
         EditorView.lineWrapping,
@@ -240,6 +276,10 @@ export function Editor({ value, onChange, mode, palette }: EditorProps) {
 
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    if (initialScrollPos) {
+      const pos = Math.min(initialScrollPos, view.state.doc.length);
+      view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+    }
     return () => {
       view.destroy();
       viewRef.current = null;

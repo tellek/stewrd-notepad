@@ -25591,6 +25591,31 @@ var infiniteScroll = ViewPlugin.fromClass(
     }
   }
 );
+function scrollReporter(onPos) {
+  return ViewPlugin.fromClass(
+    class {
+      constructor(view) {
+        this.view = view;
+        view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
+      }
+      view;
+      onScroll = () => {
+        const pos = this.view.lineBlockAtHeight(this.view.scrollDOM.scrollTop).from;
+        onPos()?.(pos);
+      };
+      destroy() {
+        this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
+      }
+    }
+  );
+}
+function selectTrimmed(view) {
+  view.dispatch({ selection: { anchor: 0, head: trimTrailingBlank(view.state.doc.toString()).length }, userEvent: "select" });
+  return true;
+}
+function trimTrailingBlank(text2) {
+  return text2.trimEnd();
+}
 function highlightExtension(palette) {
   return syntaxHighlighting(
     HighlightStyle.define([
@@ -25664,7 +25689,7 @@ function buildMarkDecorations(view) {
   );
   return deco;
 }
-function Editor({ value, onChange, mode, palette }) {
+function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos }) {
   const containerRef = useRef(null);
   const viewRef = useRef(null);
   const themeCompartment = useRef(new Compartment());
@@ -25672,6 +25697,8 @@ function Editor({ value, onChange, mode, palette }) {
   const modeCompartment = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onScrollPosRef = useRef(onScrollPos);
+  onScrollPosRef.current = onScrollPos;
   useEffect(() => {
     if (!containerRef.current) return;
     const listNestingKeymap = keymap.of([
@@ -25687,6 +25714,8 @@ function Editor({ value, onChange, mode, palette }) {
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         listNestingKeymap,
+        Prec.high(keymap.of([{ key: "Mod-a", run: selectTrimmed }])),
+        scrollReporter(() => onScrollPosRef.current),
         markdown({ base: markdownLanguage, codeLanguages: CODE_LANGUAGES }),
         highlightActiveLine(),
         EditorView.lineWrapping,
@@ -25704,6 +25733,10 @@ function Editor({ value, onChange, mode, palette }) {
     });
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    if (initialScrollPos) {
+      const pos = Math.min(initialScrollPos, view.state.doc.length);
+      view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+    }
     return () => {
       view.destroy();
       viewRef.current = null;
@@ -31429,6 +31462,17 @@ function toggleChecklistAt(content2, index) {
     return `${before}${mark.toLowerCase() === "x" ? " " : "x"}${after}`;
   });
 }
+var lastSet;
+function setIcon(api, color, tooltip) {
+  try {
+    const current = api.statusIcon.get();
+    if (current !== "idle" && current !== "success" && current !== lastSet) return;
+    api.statusIcon.set(color, tooltip);
+    lastSet = color;
+  } catch {
+  }
+}
+var SCROLL_SAVE_DEBOUNCE_MS = 500;
 function Component({ api }) {
   const [content2, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
@@ -31437,10 +31481,17 @@ function Component({ api }) {
   const [saveState, setSaveState] = useState("idle");
   const saveTimer = useRef2(void 0);
   const contentRef = useRef2("");
+  const scrollPosRef = useRef2(0);
+  const scrollTimer = useRef2(void 0);
   const palette = api.theme.palette;
   useEffect2(() => {
     (async () => {
-      const [text2, s] = await Promise.all([loadNote(api), loadSettings(PLUGIN_ID)]);
+      const [text2, s, scrollPos] = await Promise.all([
+        loadNote(api),
+        loadSettings(PLUGIN_ID),
+        api.storage.get("scrollPos")
+      ]);
+      scrollPosRef.current = scrollPos ?? 0;
       setContent(text2);
       contentRef.current = text2;
       setSettings(s);
@@ -31453,16 +31504,26 @@ function Component({ api }) {
     saveTimer.current = void 0;
     saveNote(api, value.trimEnd()).then(() => {
       setSaveState("success");
-      api.statusIcon.set("idle");
+      setIcon(api, "success");
     }).catch(() => {
       setSaveState("error");
-      api.statusIcon.set("error", "save failed");
+      setIcon(api, "error", "save failed");
     });
+  }
+  function onScrollPos(pos) {
+    scrollPosRef.current = pos;
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      scrollTimer.current = void 0;
+      api.storage.set("scrollPos", pos).catch(() => {
+      });
+    }, SCROLL_SAVE_DEBOUNCE_MS);
   }
   function onChange(value) {
     setContent(value);
     contentRef.current = value;
     setSaveState("warning");
+    setIcon(api, "warning");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => flushSave(value), settings.autosaveDebounceMs);
   }
@@ -31470,7 +31531,11 @@ function Component({ api }) {
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
-        saveNote(api, contentRef.current.trimEnd()).catch(() => {
+        saveNote(api, contentRef.current.trimEnd()).then(() => setIcon(api, "success")).catch(() => setIcon(api, "error", "save failed"));
+      }
+      if (scrollTimer.current) {
+        clearTimeout(scrollTimer.current);
+        api.storage.set("scrollPos", scrollPosRef.current).catch(() => {
         });
       }
     };
@@ -31484,6 +31549,14 @@ function Component({ api }) {
     await api.fs.writeTextFile(`harvest/note-${timestamp}.md`, content2.trimEnd());
     onChange("");
     api.toast.show({ message: "Moved to harvest folder", kind: "success" });
+  }
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(trimTrailingBlank(content2));
+      api.toast.show({ message: "Copied To Clipboard", kind: "success" });
+    } catch {
+      api.toast.show({ message: "Copy Failed", kind: "error" });
+    }
   }
   function handleChecklistToggle(index) {
     onChange(toggleChecklistAt(content2, index));
@@ -31505,11 +31578,22 @@ function Component({ api }) {
       ),
       /* @__PURE__ */ jsxs2("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
         /* @__PURE__ */ jsx4(api.ui.StatusDot, { color: saveState }),
-        /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Clear", onClick: handleClear, disabled: !content2.trim(), variant: "secondary" }),
-        /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Shift", onClick: handleShift, disabled: !content2.trim(), variant: "secondary" })
+        /* @__PURE__ */ jsx4("span", { title: "Copy Note To Clipboard", children: /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Copy", onClick: handleCopy, disabled: !content2.trim(), variant: "secondary" }) }),
+        /* @__PURE__ */ jsx4("span", { title: "Clear The Note", children: /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Clear", onClick: handleClear, disabled: !content2.trim(), variant: "secondary" }) }),
+        /* @__PURE__ */ jsx4("span", { title: "Move Note To Harvest Folder", children: /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Shift", onClick: handleShift, disabled: !content2.trim(), variant: "secondary" }) })
       ] })
     ] }),
-    /* @__PURE__ */ jsx4("div", { style: { flex: 1, minHeight: 0, display: "flex", marginTop: 8 }, children: mode === "reading" ? /* @__PURE__ */ jsx4(ReadingView, { content: content2, palette, onChecklistToggle: handleChecklistToggle }) : /* @__PURE__ */ jsx4(Editor, { value: content2, onChange, mode: mode === "live-preview" ? "live-preview" : "source", palette }) })
+    /* @__PURE__ */ jsx4("div", { style: { flex: 1, minHeight: 0, display: "flex", marginTop: 8 }, children: mode === "reading" ? /* @__PURE__ */ jsx4(ReadingView, { content: content2, palette, onChecklistToggle: handleChecklistToggle }) : /* @__PURE__ */ jsx4(
+      Editor,
+      {
+        value: content2,
+        onChange,
+        mode: mode === "live-preview" ? "live-preview" : "source",
+        palette,
+        initialScrollPos: scrollPosRef.current,
+        onScrollPos
+      }
+    ) })
   ] });
 }
 export {
