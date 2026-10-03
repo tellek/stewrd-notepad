@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { PluginApi, PluginContext } from "stewrd-plugin-api";
 import { loadSettings } from "./settings";
+import { setStatus } from "./status";
 
 interface FsDirEntry {
   name: string;
@@ -131,7 +132,7 @@ export class Harvester {
 
   private async runHarvest(fileNames: string[]) {
     const api = this.ctx.api;
-    api.statusIcon.set("in-progress", "building wiki...");
+    setStatus(api, "harvester", "in-progress", "building wiki...");
 
     const [wikiBefore, processedBefore] = await Promise.all([snapshotDir(api, "wiki"), snapshotDir(api, "processed")]);
     const rootPath = await api.fs.getRootPath();
@@ -160,7 +161,7 @@ export class Harvester {
     } catch (err) {
       if (this.disposed) return; // finished after deactivation - don't touch storage
       api.log.error(`notepad harvester run failed: ${err}`);
-      api.statusIcon.set("error", "wiki build failed");
+      setStatus(api, "harvester", "error", "wiki build failed");
       await this.bumpAttempts(fileNames);
       return;
     } finally {
@@ -174,12 +175,12 @@ export class Harvester {
 
     if (changed) {
       await this.finishFiles(fileNames, "processed");
-      api.statusIcon.set("success", "wiki updated");
+      setStatus(api, "harvester", "success", "wiki updated");
     } else {
       // A legitimate no-op (nothing durable in the note) is not a failure by
       // itself - only resubmitting the same file forever is the problem.
       await this.bumpAttempts(fileNames, "processed");
-      api.statusIcon.set("success", "no wiki changes needed");
+      setStatus(api, "harvester", "success", "no wiki changes needed");
     }
   }
 
@@ -217,7 +218,7 @@ export class Harvester {
       // Surfaced loudly, not swallowed - leaving the file in harvest/ would
       // cause every later tick to resubmit it.
       api.log.error(`notepad harvester: failed to move ${name} to ${dest}/: ${err}`);
-      api.statusIcon.set("error", `could not archive ${name}`);
+      setStatus(api, "harvester", "error", `could not archive ${name}`);
     }
   }
 }

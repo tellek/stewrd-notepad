@@ -284,3 +284,17 @@ import type { PluginContext, PluginApi } from "stewrd-plugin-api";
 Plugins are portable: zip up a plugin's folder (including its built `dist/`)
 and hand it to someone else, or install it via **Settings > Plugins > Add
 plugin** (`.zip`/`.tar`/`.tar.gz`/`.tgz` supported).
+
+# Status Color Rules (this plugin)
+
+Implemented in `status.ts`; all status changes MUST go through `setStatus(api, source, color, tooltip?)`, never `api.statusIcon.set` directly.
+
+- Every plugin shows a dot describing what it is doing, colored from the palette:
+    - Idle: `status.idle`
+    - Working (saving, processing, etc.): `status.in-progress`
+    - Action completed successfully: `status.success` for 3 seconds, counted only while the app has focus AND the plugin pane is showing. If the user is in another app or another plugin, it stays `status.success` until they return, then resets 3 seconds later.
+    - Non-breaking issue that needs no user action: `status.warning`
+    - Breaking error: `status.error`
+- The sidebar icon follows the dot. With multiple dots/sources the icon shows the highest priority: error > warning > in-progress > success > idle.
+- When the dot is idle, the sidebar icon uses the default color (the host's idle tint), not `status.idle`.
+- New background activity gets its own `StatusSource` in `status.ts` so priority is resolved in one place.

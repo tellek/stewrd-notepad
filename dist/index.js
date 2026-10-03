@@ -5,7 +5,7 @@ var __export = (target, all) => {
 };
 
 // index.tsx
-import { useEffect as useEffect2, useRef as useRef2, useState } from "react";
+import { useEffect as useEffect2, useRef as useRef2, useState, useSyncExternalStore } from "react";
 
 // editor.tsx
 import { useEffect, useRef } from "react";
@@ -31247,6 +31247,55 @@ async function loadSettings(pluginId) {
   }
 }
 
+// status.ts
+var PRIORITY = ["idle", "success", "in-progress", "warning", "error"];
+var SUCCESS_RESET_MS = 3e3;
+var colors = { save: "idle", harvester: "idle" };
+var listeners = /* @__PURE__ */ new Set();
+var lastApi;
+var viewing = false;
+var resetTimer;
+function getStatus(source) {
+  return colors[source];
+}
+function subscribeStatus(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+function setStatus(api, source, color, tooltip) {
+  lastApi = api;
+  colors[source] = color;
+  publish(tooltip);
+  scheduleReset();
+}
+function setViewing(value) {
+  viewing = value;
+  scheduleReset();
+}
+function publish(tooltip) {
+  const worst = Object.values(colors).reduce((a, b) => PRIORITY.indexOf(b) > PRIORITY.indexOf(a) ? b : a, "idle");
+  try {
+    lastApi?.statusIcon.set(worst, tooltip);
+  } catch {
+  }
+  listeners.forEach((fn) => fn());
+}
+function scheduleReset() {
+  if (resetTimer) clearTimeout(resetTimer);
+  resetTimer = void 0;
+  const pending = Object.values(colors).includes("success");
+  if (!pending || !viewing || !document.hasFocus()) return;
+  resetTimer = setTimeout(() => {
+    resetTimer = void 0;
+    for (const source of Object.keys(colors)) {
+      if (colors[source] === "success") colors[source] = "idle";
+    }
+    publish();
+  }, SUCCESS_RESET_MS);
+}
+window.addEventListener("focus", scheduleReset);
+window.addEventListener("blur", scheduleReset);
+
 // harvester.ts
 var MAX_ATTEMPTS = 3;
 var RUN_TIMEOUT_MS = 5 * 60 * 1e3;
@@ -31349,7 +31398,7 @@ var Harvester = class {
   }
   async runHarvest(fileNames) {
     const api = this.ctx.api;
-    api.statusIcon.set("in-progress", "building wiki...");
+    setStatus(api, "harvester", "in-progress", "building wiki...");
     const [wikiBefore, processedBefore] = await Promise.all([snapshotDir(api, "wiki"), snapshotDir(api, "processed")]);
     const rootPath = await api.fs.getRootPath();
     const extraArgs = [
@@ -31376,7 +31425,7 @@ var Harvester = class {
     } catch (err) {
       if (this.disposed) return;
       api.log.error(`notepad harvester run failed: ${err}`);
-      api.statusIcon.set("error", "wiki build failed");
+      setStatus(api, "harvester", "error", "wiki build failed");
       await this.bumpAttempts(fileNames);
       return;
     } finally {
@@ -31387,10 +31436,10 @@ var Harvester = class {
     const changed = snapshotsDiffer(wikiBefore, wikiAfter) || snapshotsDiffer(processedBefore, processedAfter);
     if (changed) {
       await this.finishFiles(fileNames, "processed");
-      api.statusIcon.set("success", "wiki updated");
+      setStatus(api, "harvester", "success", "wiki updated");
     } else {
       await this.bumpAttempts(fileNames, "processed");
-      api.statusIcon.set("success", "no wiki changes needed");
+      setStatus(api, "harvester", "success", "no wiki changes needed");
     }
   }
   async bumpAttempts(fileNames, onSuccessMoveTo) {
@@ -31422,7 +31471,7 @@ var Harvester = class {
       await api.fs.renameFile(`harvest/${name2}`, `${dest}/${name2}`);
     } catch (err) {
       api.log.error(`notepad harvester: failed to move ${name2} to ${dest}/: ${err}`);
-      api.statusIcon.set("error", `could not archive ${name2}`);
+      setStatus(api, "harvester", "error", `could not archive ${name2}`);
     }
   }
 };
@@ -31462,21 +31511,13 @@ function toggleChecklistAt(content2, index) {
     return `${before}${mark.toLowerCase() === "x" ? " " : "x"}${after}`;
   });
 }
-function setIcon(api, color, tooltip) {
-  try {
-    api.statusIcon.set(color, tooltip);
-  } catch {
-  }
-}
 var SCROLL_SAVE_DEBOUNCE_MS = 500;
-var SUCCESS_RESET_MS = 3e3;
-var successPending = false;
 function Component({ api }) {
   const [content2, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [saveState, setSaveState] = useState(successPending ? "success" : "idle");
+  const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
   const saveTimer = useRef2(void 0);
   const contentRef = useRef2("");
   const scrollPosRef = useRef2(0);
@@ -31498,26 +31539,14 @@ function Component({ api }) {
     })();
   }, []);
   useEffect2(() => {
-    if (saveState !== "success") return;
-    const t2 = setTimeout(() => {
-      successPending = false;
-      setSaveState("idle");
-      setIcon(api, "idle");
-    }, SUCCESS_RESET_MS);
-    return () => clearTimeout(t2);
-  }, [saveState]);
+    setViewing(true);
+    return () => setViewing(false);
+  }, []);
   function flushSave(value) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = void 0;
-    saveNote(api, value.trimEnd()).then(() => {
-      successPending = true;
-      setSaveState("success");
-      setIcon(api, "success");
-    }).catch(() => {
-      successPending = false;
-      setSaveState("error");
-      setIcon(api, "error", "save failed");
-    });
+    setStatus(api, "save", "in-progress");
+    saveNote(api, value.trimEnd()).then(() => setStatus(api, "save", "success")).catch(() => setStatus(api, "save", "error", "save failed"));
   }
   function onScrollPos(pos) {
     scrollPosRef.current = pos;
@@ -31531,9 +31560,7 @@ function Component({ api }) {
   function onChange(value) {
     setContent(value);
     contentRef.current = value;
-    successPending = false;
-    setSaveState("warning");
-    setIcon(api, "warning");
+    setStatus(api, "save", "warning");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => flushSave(value), settings.autosaveDebounceMs);
   }
@@ -31541,10 +31568,7 @@ function Component({ api }) {
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
-        saveNote(api, contentRef.current.trimEnd()).then(() => {
-          successPending = true;
-          setIcon(api, "success");
-        }).catch(() => setIcon(api, "error", "save failed"));
+        saveNote(api, contentRef.current.trimEnd()).then(() => setStatus(api, "save", "success")).catch(() => setStatus(api, "save", "error", "save failed"));
       }
       if (scrollTimer.current) {
         clearTimeout(scrollTimer.current);

@@ -1,10 +1,11 @@
 /// <reference path="../.stewrd/plugin-api.d.ts" />
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { PluginContext, PluginApi } from "stewrd-plugin-api";
 import { Editor, trimTrailingBlank, type Palette } from "./editor";
 import { ReadingView } from "./ReadingView";
 import { Harvester } from "./harvester";
 import { loadNote, saveNote } from "./note";
+import { getStatus, setStatus, setViewing, subscribeStatus } from "./status";
 import { DEFAULT_SETTINGS, loadSettings, type NotepadSettings } from "./settings";
 
 type Mode = "source" | "live-preview" | "reading";
@@ -33,32 +34,14 @@ function toggleChecklistAt(content: string, index: number): string {
   });
 }
 
-type SaveState = "idle" | "warning" | "success" | "error";
-
-// Mirror the save dot onto the sidebar icon. Throws after
-// deactivation/hot-reload, so swallow it.
-function setIcon(api: PluginApi, color: SaveState, tooltip?: string) {
-  try {
-    api.statusIcon.set(color, tooltip);
-  } catch {
-    // plugin deactivated
-  }
-}
-
 const SCROLL_SAVE_DEBOUNCE_MS = 500;
-const SUCCESS_RESET_MS = 3000;
-
-// True while the success color is showing and hasn't had 3s on screen yet.
-// Module-level so a save that lands while the pane is unmounted still resets
-// once the user comes back.
-let successPending = false;
 
 export function Component({ api }: { api: PluginApi }) {
   const [content, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState<NotepadSettings>(DEFAULT_SETTINGS);
-  const [saveState, setSaveState] = useState<SaveState>(successPending ? "success" : "idle");
+  const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const contentRef = useRef("");
   const scrollPosRef = useRef(0);
@@ -82,18 +65,11 @@ export function Component({ api }: { api: PluginApi }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fade success back to the default color 3s after it's shown, but only while
-  // the pane is mounted; the cleanup cancels the timer when the user leaves.
   useEffect(() => {
-    if (saveState !== "success") return;
-    const t = setTimeout(() => {
-      successPending = false;
-      setSaveState("idle");
-      setIcon(api, "idle");
-    }, SUCCESS_RESET_MS);
-    return () => clearTimeout(t);
+    setViewing(true);
+    return () => setViewing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveState]);
+  }, []);
 
   function flushSave(value: string) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -102,17 +78,10 @@ export function Component({ api }: { api: PluginApi }) {
     // past the end of the note (see editor.tsx's infiniteScroll) - trim
     // those back out before they ever touch disk. The live buffer/cursor/
     // scroll position are untouched; only the saved copy is trimmed.
+    setStatus(api, "save", "in-progress");
     saveNote(api, value.trimEnd())
-      .then(() => {
-        successPending = true;
-        setSaveState("success");
-        setIcon(api, "success");
-      })
-      .catch(() => {
-        successPending = false;
-        setSaveState("error");
-        setIcon(api, "error", "save failed");
-      });
+      .then(() => setStatus(api, "save", "success"))
+      .catch(() => setStatus(api, "save", "error", "save failed"));
   }
 
   function onScrollPos(pos: number) {
@@ -130,9 +99,7 @@ export function Component({ api }: { api: PluginApi }) {
   function onChange(value: string) {
     setContent(value);
     contentRef.current = value;
-    successPending = false;
-    setSaveState("warning"); // unsaved changes pending
-    setIcon(api, "warning");
+    setStatus(api, "save", "warning"); // unsaved changes pending
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => flushSave(value), settings.autosaveDebounceMs);
   }
@@ -144,11 +111,8 @@ export function Component({ api }: { api: PluginApi }) {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
         saveNote(api, contentRef.current.trimEnd())
-          .then(() => {
-            successPending = true;
-            setIcon(api, "success");
-          })
-          .catch(() => setIcon(api, "error", "save failed"));
+          .then(() => setStatus(api, "save", "success"))
+          .catch(() => setStatus(api, "save", "error", "save failed"));
       }
       if (scrollTimer.current) {
         clearTimeout(scrollTimer.current);
