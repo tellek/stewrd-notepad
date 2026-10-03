@@ -1,6 +1,6 @@
 {
   "category": "Utilities",
-  "version": "2.0.0",
+  "version": "1.0.1",
   "defaultMode": "live-preview",
   "autosaveDebounceMs": 1000,
   "harvesterEnabled": false,
