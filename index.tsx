@@ -35,18 +35,11 @@ function toggleChecklistAt(content: string, index: number): string {
 
 type SaveState = "idle" | "warning" | "success" | "error";
 
-// Last color this component put on the sidebar icon. Module-level so it
-// survives remounts; lets us tell our own status apart from the harvester's.
-let lastSet: SaveState | undefined;
-
-// Mirror the save dot onto the sidebar icon without hiding a harvester error
-// or in-progress status. Throws after deactivation/hot-reload, so swallow it.
+// Mirror the save dot onto the sidebar icon. Throws after
+// deactivation/hot-reload, so swallow it.
 function setIcon(api: PluginApi, color: SaveState, tooltip?: string) {
   try {
-    const current = api.statusIcon.get();
-    if (current !== "idle" && current !== "success" && current !== lastSet) return;
     api.statusIcon.set(color, tooltip);
-    lastSet = color;
   } catch {
     // plugin deactivated
   }

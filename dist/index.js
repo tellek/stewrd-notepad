@@ -31462,13 +31462,9 @@ function toggleChecklistAt(content2, index) {
     return `${before}${mark.toLowerCase() === "x" ? " " : "x"}${after}`;
   });
 }
-var lastSet;
 function setIcon(api, color, tooltip) {
   try {
-    const current = api.statusIcon.get();
-    if (current !== "idle" && current !== "success" && current !== lastSet) return;
     api.statusIcon.set(color, tooltip);
-    lastSet = color;
   } catch {
   }
 }
