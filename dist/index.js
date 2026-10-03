@@ -31469,12 +31469,14 @@ function setIcon(api, color, tooltip) {
   }
 }
 var SCROLL_SAVE_DEBOUNCE_MS = 500;
+var SUCCESS_RESET_MS = 3e3;
+var successPending = false;
 function Component({ api }) {
   const [content2, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [saveState, setSaveState] = useState("idle");
+  const [saveState, setSaveState] = useState(successPending ? "success" : "idle");
   const saveTimer = useRef2(void 0);
   const contentRef = useRef2("");
   const scrollPosRef = useRef2(0);
@@ -31495,13 +31497,24 @@ function Component({ api }) {
       setLoaded(true);
     })();
   }, []);
+  useEffect2(() => {
+    if (saveState !== "success") return;
+    const t2 = setTimeout(() => {
+      successPending = false;
+      setSaveState("idle");
+      setIcon(api, "idle");
+    }, SUCCESS_RESET_MS);
+    return () => clearTimeout(t2);
+  }, [saveState]);
   function flushSave(value) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = void 0;
     saveNote(api, value.trimEnd()).then(() => {
+      successPending = true;
       setSaveState("success");
       setIcon(api, "success");
     }).catch(() => {
+      successPending = false;
       setSaveState("error");
       setIcon(api, "error", "save failed");
     });
@@ -31518,6 +31531,7 @@ function Component({ api }) {
   function onChange(value) {
     setContent(value);
     contentRef.current = value;
+    successPending = false;
     setSaveState("warning");
     setIcon(api, "warning");
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -31527,7 +31541,10 @@ function Component({ api }) {
     return () => {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
-        saveNote(api, contentRef.current.trimEnd()).then(() => setIcon(api, "success")).catch(() => setIcon(api, "error", "save failed"));
+        saveNote(api, contentRef.current.trimEnd()).then(() => {
+          successPending = true;
+          setIcon(api, "success");
+        }).catch(() => setIcon(api, "error", "save failed"));
       }
       if (scrollTimer.current) {
         clearTimeout(scrollTimer.current);
