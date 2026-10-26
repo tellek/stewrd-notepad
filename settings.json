@@ -1,6 +1,6 @@
 {
   "category": "Utilities",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "defaultMode": "live-preview",
   "autosaveDebounceMs": 1000,
   "aiEffort": "medium",
