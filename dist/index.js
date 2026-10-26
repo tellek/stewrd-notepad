@@ -31520,8 +31520,7 @@ End your reply with a final line \`MEMORIES_CREATED: <n>\` (the number of memori
     if (ctx.signal.aborted) return;
     const count2 = parseCount(reply);
     const message = count2 === null ? "Harvest complete (memory count not reported)" : `Harvest complete: ${count2} memories created`;
-    await api.fs.deleteFile(path).catch((err) => api.log.warn(`notepad harvest: could not delete ${path}: ${err}`));
-    if (ctx.signal.aborted) return;
+    api.log.info(`notepad harvest reply: ${reply.trim().slice(-500)}`);
     setStatus(api, "harvester", "success", message);
     api.log.info(message);
   } catch (err) {

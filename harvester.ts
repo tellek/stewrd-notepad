@@ -105,8 +105,7 @@ export async function startHarvest(api: PluginApi, text: string, onSaved: () => 
     const count = parseCount(reply);
     const message =
       count === null ? "Harvest complete (memory count not reported)" : `Harvest complete: ${count} memories created`;
-    await api.fs.deleteFile(path).catch((err) => api.log.warn(`notepad harvest: could not delete ${path}: ${err}`));
-    if (ctx.signal.aborted) return;
+    api.log.info(`notepad harvest reply: ${reply.trim().slice(-500)}`);
     setStatus(api, "harvester", "success", message);
     api.log.info(message);
   } catch (err) {
