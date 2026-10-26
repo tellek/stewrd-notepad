@@ -8,7 +8,7 @@ if not exist node_modules call npm install || exit /b 1
 call npm run build || exit /b 1
 
 rem Release zip: forward-slash paths, no wrapping folder (marketplace extraction requires it).
-python package-zip.py notepad.zip || exit /b 1
+py package-zip.py notepad.zip || exit /b 1
 rem storage.json and data\ hold the plugin's runtime state in the deploy folder, so /MIR must not delete them.
 robocopy "%REPO%." "%DEPLOY%" /MIR /NFL /NDL /NJH /NP ^
   /XD .git .remember .serena node_modules data ^
