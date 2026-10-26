@@ -337,6 +337,7 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
     if (initialCursor) {
       view.dispatch({ selection: { anchor: Math.min(initialCursor, view.state.doc.length) } });
     }
+    view.focus();
     let releaseSuppress: (() => void) | undefined;
     let restoreFrame = 0;
     if (initialScrollPos) {
