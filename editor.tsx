@@ -277,11 +277,13 @@ export interface EditorProps {
   onCheckboxToggle?: (lineNumber: number) => void;
   initialScrollPos?: number;
   onScrollPos?: (pos: number) => void;
+  initialCursor?: number;
+  onCursor?: (pos: number) => void;
   /** Bumped after each successful save; triggers a padding strip. */
   savedTick?: number;
 }
 
-export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, savedTick }: EditorProps) {
+export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, initialCursor, onCursor, savedTick }: EditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
@@ -291,6 +293,8 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
   onChangeRef.current = onChange;
   const onScrollPosRef = useRef(onScrollPos);
   onScrollPosRef.current = onScrollPos;
+  const onCursorRef = useRef(onCursor);
+  onCursorRef.current = onCursor;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -320,6 +324,7 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
         highlightCompartment.current.of(highlightExtension(palette)),
         modeCompartment.current.of(mode === "live-preview" ? [livePreviewMarks] : []),
         EditorView.updateListener.of((update) => {
+          if (update.selectionSet || update.docChanged) onCursorRef.current?.(update.state.selection.main.head);
           if (update.docChanged && !update.transactions.some((tr) => tr.annotation(paddingAnnotation))) {
             onChangeRef.current(update.state.doc.toString());
           }
@@ -329,6 +334,9 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
 
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    if (initialCursor) {
+      view.dispatch({ selection: { anchor: Math.min(initialCursor, view.state.doc.length) } });
+    }
     let releaseSuppress: (() => void) | undefined;
     let restoreFrame = 0;
     if (initialScrollPos) {

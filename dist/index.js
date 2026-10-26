@@ -25739,7 +25739,7 @@ function buildMarkDecorations(view) {
   );
   return deco;
 }
-function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, savedTick }) {
+function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, initialCursor, onCursor, savedTick }) {
   const containerRef = useRef(null);
   const viewRef = useRef(null);
   const themeCompartment = useRef(new Compartment());
@@ -25749,6 +25749,8 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos,
   onChangeRef.current = onChange;
   const onScrollPosRef = useRef(onScrollPos);
   onScrollPosRef.current = onScrollPos;
+  const onCursorRef = useRef(onCursor);
+  onCursorRef.current = onCursor;
   useEffect(() => {
     if (!containerRef.current) return;
     const listNestingKeymap = keymap.of([
@@ -25775,6 +25777,7 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos,
         highlightCompartment.current.of(highlightExtension(palette)),
         modeCompartment.current.of(mode === "live-preview" ? [livePreviewMarks] : []),
         EditorView.updateListener.of((update) => {
+          if (update.selectionSet || update.docChanged) onCursorRef.current?.(update.state.selection.main.head);
           if (update.docChanged && !update.transactions.some((tr) => tr.annotation(paddingAnnotation))) {
             onChangeRef.current(update.state.doc.toString());
           }
@@ -25783,6 +25786,9 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos,
     });
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    if (initialCursor) {
+      view.dispatch({ selection: { anchor: Math.min(initialCursor, view.state.doc.length) } });
+    }
     let releaseSuppress;
     let restoreFrame = 0;
     if (initialScrollPos) {
@@ -31590,16 +31596,20 @@ function Component({ api }) {
   const saveTimer = useRef2(void 0);
   const contentRef = useRef2("");
   const scrollPosRef = useRef2(0);
+  const cursorRef = useRef2(0);
+  const cursorTimer = useRef2(void 0);
   const scrollTimer = useRef2(void 0);
   const palette = api.theme.palette;
   useEffect2(() => {
     (async () => {
-      const [text2, s, scrollPos] = await Promise.all([
+      const [text2, s, scrollPos, cursor] = await Promise.all([
         loadNote(api),
         loadSettings(PLUGIN_ID),
-        api.storage.get("scrollPos")
+        api.storage.get("scrollPos"),
+        api.storage.get("cursorPos")
       ]);
       scrollPosRef.current = scrollPos ?? 0;
+      cursorRef.current = cursor ?? 0;
       setContent(text2);
       contentRef.current = text2;
       setSettings(s);
@@ -31616,6 +31626,15 @@ function Component({ api }) {
     saveTimer.current = void 0;
     setStatus(api, "save", "in-progress");
     saveNote(api, value.trimEnd()).then(() => setStatus(api, "save", "success")).catch(() => setStatus(api, "save", "error", "save failed")).then(() => setSavedTick((t2) => t2 + 1));
+  }
+  function onCursor(pos) {
+    cursorRef.current = pos;
+    if (cursorTimer.current) clearTimeout(cursorTimer.current);
+    cursorTimer.current = setTimeout(() => {
+      cursorTimer.current = void 0;
+      api.storage.set("cursorPos", pos).catch(() => {
+      });
+    }, SCROLL_SAVE_DEBOUNCE_MS);
   }
   function onScrollPos(pos) {
     scrollPosRef.current = pos;
@@ -31638,6 +31657,11 @@ function Component({ api }) {
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
         saveNote(api, contentRef.current.trimEnd()).then(() => setStatus(api, "save", "success")).catch(() => setStatus(api, "save", "error", "save failed"));
+      }
+      if (cursorTimer.current) {
+        clearTimeout(cursorTimer.current);
+        api.storage.set("cursorPos", cursorRef.current).catch(() => {
+        });
       }
       if (scrollTimer.current) {
         clearTimeout(scrollTimer.current);
@@ -31698,6 +31722,8 @@ function Component({ api }) {
         palette,
         initialScrollPos: scrollPosRef.current,
         onScrollPos,
+        initialCursor: cursorRef.current,
+        onCursor,
         savedTick
       }
     ) })

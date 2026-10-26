@@ -46,17 +46,21 @@ export function Component({ api }: { api: PluginApi }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const contentRef = useRef("");
   const scrollPosRef = useRef(0);
+  const cursorRef = useRef(0);
+  const cursorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const palette = api.theme.palette as Palette;
 
   useEffect(() => {
     (async () => {
-      const [text, s, scrollPos] = await Promise.all([
+      const [text, s, scrollPos, cursor] = await Promise.all([
         loadNote(api),
         loadSettings(PLUGIN_ID),
         api.storage.get<number>("scrollPos"),
+        api.storage.get<number>("cursorPos"),
       ]);
       scrollPosRef.current = scrollPos ?? 0;
+      cursorRef.current = cursor ?? 0;
       setContent(text);
       contentRef.current = text;
       setSettings(s);
@@ -84,6 +88,15 @@ export function Component({ api }: { api: PluginApi }) {
       .then(() => setStatus(api, "save", "success"))
       .catch(() => setStatus(api, "save", "error", "save failed"))
       .then(() => setSavedTick((t) => t + 1)); // separate step: a strip problem can't flip the save status
+  }
+
+  function onCursor(pos: number) {
+    cursorRef.current = pos;
+    if (cursorTimer.current) clearTimeout(cursorTimer.current);
+    cursorTimer.current = setTimeout(() => {
+      cursorTimer.current = undefined;
+      api.storage.set("cursorPos", pos).catch(() => {});
+    }, SCROLL_SAVE_DEBOUNCE_MS);
   }
 
   function onScrollPos(pos: number) {
@@ -115,6 +128,10 @@ export function Component({ api }: { api: PluginApi }) {
         saveNote(api, contentRef.current.trimEnd())
           .then(() => setStatus(api, "save", "success"))
           .catch(() => setStatus(api, "save", "error", "save failed"));
+      }
+      if (cursorTimer.current) {
+        clearTimeout(cursorTimer.current);
+        api.storage.set("cursorPos", cursorRef.current).catch(() => {});
       }
       if (scrollTimer.current) {
         clearTimeout(scrollTimer.current);
@@ -187,6 +204,8 @@ export function Component({ api }: { api: PluginApi }) {
             palette={palette}
             initialScrollPos={scrollPosRef.current}
             onScrollPos={onScrollPos}
+            initialCursor={cursorRef.current}
+            onCursor={onCursor}
             savedTick={savedTick}
           />
         )}
