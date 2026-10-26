@@ -68,8 +68,8 @@ facts to your own memory system. The AI is asked to end its reply with
 `MEMORIES_CREATED: <n>`.
 
 The status bar shows that harvesting has started, then how many memories were
-created. Every run appends the AI's full reply (or the error) to `harvest/harvest.log`,
-which explains why it saved what it did. On success the temp file stays in `harvest/`; on failure it is moved to
+created. When nothing is saved, the AI's one-sentence reason is shown in the status bar
+under the completion message. On success the temp file stays in `harvest/`; on failure it is moved to
 `harvest/failed/`. The note is not restored, so the masked copy there is the
 only one.
 
