@@ -10,15 +10,3 @@
 export function keepLength(text, head) {
   return Math.max(text.trimEnd().length, head);
 }
-
-/**
- * Blank lines to append on remount so a saved scroll offset past the end of the
- * (trimmed) document is reachable again.
- * @param {number} docLength
- * @param {number} scrollPos
- * @param {number} batch
- * @returns {number}
- */
-export function restorePadLines(docLength, scrollPos, batch) {
-  return Math.max(0, scrollPos - docLength) + batch;
-}

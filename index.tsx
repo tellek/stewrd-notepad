@@ -99,7 +99,9 @@ export function Component({ api }: { api: PluginApi }) {
     }, SCROLL_SAVE_DEBOUNCE_MS);
   }
 
-  function onScrollPos(pos: number) {
+  function onScrollPos(rawPos: number) {
+    // Never save a position inside blank padding; it would be rebuilt on remount.
+    const pos = Math.min(rawPos, contentRef.current.trimEnd().length);
     scrollPosRef.current = pos;
     if (scrollTimer.current) clearTimeout(scrollTimer.current);
     scrollTimer.current = setTimeout(() => {
@@ -112,8 +114,10 @@ export function Component({ api }: { api: PluginApi }) {
   // the timer lives here (not tied to any DOM focus state) so it fires
   // regardless of what else has focus by the time it goes off.
   function onChange(value: string) {
-    setContent(value);
-    contentRef.current = value;
+    // Keep padding out of React state so mode switches don't carry it forward.
+    const text = value.trimEnd();
+    setContent(text);
+    contentRef.current = text;
     setStatus(api, "save", "warning"); // unsaved changes pending
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => flushSave(value), settings.autosaveDebounceMs);

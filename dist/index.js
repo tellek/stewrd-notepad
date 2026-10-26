@@ -3494,9 +3494,6 @@ function findColumn(string2, col, tabSize, strict) {
 function keepLength(text2, head) {
   return Math.max(text2.trimEnd().length, head);
 }
-function restorePadLines(docLength, scrollPos, batch) {
-  return Math.max(0, scrollPos - docLength) + batch;
-}
 
 // node_modules/style-mod/src/style-mod.js
 var C = "\u037C";
@@ -25596,16 +25593,36 @@ var extendOnClickBelow = EditorView.domEventHandlers({
   }
 });
 var GROW_BATCH_LINES = 40;
+var MAX_PADDING_LINES = 200;
+var INPUT_EVENTS = ["wheel", "keydown", "pointerdown", "touchmove"];
+function trailingBlankLines(view) {
+  const doc2 = view.state.doc;
+  let n = 0;
+  for (let i2 = doc2.lines; i2 >= 1 && n <= MAX_PADDING_LINES; i2--, n++) {
+    if (doc2.line(i2).text.trim() !== "") break;
+  }
+  return n;
+}
 var infiniteScroll = ViewPlugin.fromClass(
   class {
     constructor(view) {
       this.view = view;
       view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
+      for (const e of INPUT_EVENTS) view.scrollDOM.addEventListener(e, this.onInput, { passive: true, capture: true });
     }
     view;
     onScroll = () => this.maybeGrow();
+    // Only grow in response to real user input: CodeMirror's stick-to-bottom
+    // re-pins after each growth and fires another scroll event, which would
+    // otherwise loop forever (even while the window is unfocused).
+    lastUserInput = 0;
+    onInput = () => {
+      this.lastUserInput = Date.now();
+    };
     maybeGrow() {
       if (suppressDepth > 0) return;
+      if (document.visibilityState !== "visible" || Date.now() - this.lastUserInput > 300) return;
+      if (trailingBlankLines(this.view) > MAX_PADDING_LINES) return;
       const el = this.view.scrollDOM;
       const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight);
       if (remaining > this.view.defaultLineHeight * (GROW_BATCH_LINES / 2)) return;
@@ -25617,6 +25634,7 @@ var infiniteScroll = ViewPlugin.fromClass(
     }
     destroy() {
       this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
+      for (const e of INPUT_EVENTS) this.view.scrollDOM.removeEventListener(e, this.onInput, { capture: true });
     }
   }
 );
@@ -25794,14 +25812,14 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos,
     let restoreFrame = 0;
     if (initialScrollPos) {
       releaseSuppress = suppressForTwoFrames();
-      const pad = restorePadLines(view.state.doc.length, initialScrollPos, GROW_BATCH_LINES);
+      const textLength2 = view.state.doc.length;
       view.dispatch({
-        changes: { from: view.state.doc.length, insert: "\n".repeat(pad) },
+        changes: { from: textLength2, insert: "\n".repeat(GROW_BATCH_LINES) },
         annotations: [paddingAnnotation.of(true), Transaction.addToHistory.of(false)]
       });
       const restore = () => {
         if (viewRef.current !== view) return;
-        const pos = Math.min(initialScrollPos, view.state.doc.length);
+        const pos = Math.min(initialScrollPos, textLength2);
         view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
       };
       restore();
@@ -31637,7 +31655,8 @@ function Component({ api }) {
       });
     }, SCROLL_SAVE_DEBOUNCE_MS);
   }
-  function onScrollPos(pos) {
+  function onScrollPos(rawPos) {
+    const pos = Math.min(rawPos, contentRef.current.trimEnd().length);
     scrollPosRef.current = pos;
     if (scrollTimer.current) clearTimeout(scrollTimer.current);
     scrollTimer.current = setTimeout(() => {
@@ -31647,8 +31666,9 @@ function Component({ api }) {
     }, SCROLL_SAVE_DEBOUNCE_MS);
   }
   function onChange(value) {
-    setContent(value);
-    contentRef.current = value;
+    const text2 = value.trimEnd();
+    setContent(text2);
+    contentRef.current = text2;
     setStatus(api, "save", "warning");
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => flushSave(value), settings.autosaveDebounceMs);

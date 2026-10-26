@@ -3,7 +3,7 @@
 // its own CodeMirror 6 instance instead.
 import { useEffect, useRef } from "react";
 import { EditorState, Compartment, Annotation, Prec, Transaction, type Extension } from "@codemirror/state";
-import { keepLength, restorePadLines } from "./padding.mjs";
+import { keepLength } from "./padding.mjs";
 import { EditorView, keymap, highlightActiveLine, Decoration, type DecorationSet, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentMore, indentLess, insertNewlineAndIndent } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -118,14 +118,35 @@ const extendOnClickBelow = EditorView.domEventHandlers({
  * further to scroll to. The trailing blank lines this produces are trimmed
  * back out at save time (see index.tsx), not kept in the saved file. */
 const GROW_BATCH_LINES = 40;
+const MAX_PADDING_LINES = 200; // backstop: never grow past this many trailing blank lines
+const INPUT_EVENTS = ["wheel", "keydown", "pointerdown", "touchmove"];
+
+function trailingBlankLines(view: EditorView): number {
+  const doc = view.state.doc;
+  let n = 0;
+  for (let i = doc.lines; i >= 1 && n <= MAX_PADDING_LINES; i--, n++) {
+    if (doc.line(i).text.trim() !== "") break;
+  }
+  return n;
+}
 const infiniteScroll = ViewPlugin.fromClass(
   class {
     private onScroll = () => this.maybeGrow();
+    // Only grow in response to real user input: CodeMirror's stick-to-bottom
+    // re-pins after each growth and fires another scroll event, which would
+    // otherwise loop forever (even while the window is unfocused).
+    private lastUserInput = 0;
+    private onInput = () => {
+      this.lastUserInput = Date.now();
+    };
     constructor(private view: EditorView) {
       view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
+      for (const e of INPUT_EVENTS) view.scrollDOM.addEventListener(e, this.onInput, { passive: true, capture: true });
     }
     maybeGrow() {
       if (suppressDepth > 0) return;
+      if (document.visibilityState !== "visible" || Date.now() - this.lastUserInput > 300) return;
+      if (trailingBlankLines(this.view) > MAX_PADDING_LINES) return;
       const el = this.view.scrollDOM;
       const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight);
       if (remaining > this.view.defaultLineHeight * (GROW_BATCH_LINES / 2)) return;
@@ -137,6 +158,7 @@ const infiniteScroll = ViewPlugin.fromClass(
     }
     destroy() {
       this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
+      for (const e of INPUT_EVENTS) this.view.scrollDOM.removeEventListener(e, this.onInput, { capture: true });
     }
   },
 );
@@ -342,14 +364,14 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
     let restoreFrame = 0;
     if (initialScrollPos) {
       releaseSuppress = suppressForTwoFrames();
-      const pad = restorePadLines(view.state.doc.length, initialScrollPos, GROW_BATCH_LINES);
+      const textLength = view.state.doc.length;
       view.dispatch({
-        changes: { from: view.state.doc.length, insert: "\n".repeat(pad) },
+        changes: { from: textLength, insert: "\n".repeat(GROW_BATCH_LINES) },
         annotations: [paddingAnnotation.of(true), Transaction.addToHistory.of(false)],
       });
       const restore = () => {
         if (viewRef.current !== view) return;
-        const pos = Math.min(initialScrollPos, view.state.doc.length);
+        const pos = Math.min(initialScrollPos, textLength);
         view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
       };
       restore();
