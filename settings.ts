@@ -14,7 +14,7 @@ export interface NotepadSettings {
 }
 
 export const DEFAULT_HARVEST_PROMPT =
-  "Extract the durable lessons learned, facts, and decisions from the note below. " +
+  "Extract the durable lessons learned, facts, and decisions from the note above. " +
   "Save each one as a separate memory using whatever memory tools or files you have available. " +
   "If nothing is worth keeping, save nothing.";
 
