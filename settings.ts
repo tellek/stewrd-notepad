@@ -9,15 +9,18 @@ import { invoke } from "@tauri-apps/api/core";
 export interface NotepadSettings {
   defaultMode: "source" | "live-preview" | "reading";
   autosaveDebounceMs: number;
-  harvesterEnabled: boolean;
-  harvesterIntervalMs: number;
+  harvestPrompt: string;
 }
+
+export const DEFAULT_HARVEST_PROMPT =
+  "Extract the durable lessons learned, facts, and decisions from the note below. " +
+  "Save each one as a separate memory using whatever memory tools or files you have available. " +
+  "If nothing is worth keeping, save nothing.";
 
 export const DEFAULT_SETTINGS: NotepadSettings = {
   defaultMode: "live-preview",
   autosaveDebounceMs: 1000,
-  harvesterEnabled: false,
-  harvesterIntervalMs: 15 * 60 * 1000,
+  harvestPrompt: DEFAULT_HARVEST_PROMPT,
 };
 
 export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
@@ -30,8 +33,10 @@ export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
           ? parsed.defaultMode
           : DEFAULT_SETTINGS.defaultMode,
       autosaveDebounceMs: typeof parsed.autosaveDebounceMs === "number" ? parsed.autosaveDebounceMs : DEFAULT_SETTINGS.autosaveDebounceMs,
-      harvesterEnabled: typeof parsed.harvesterEnabled === "boolean" ? parsed.harvesterEnabled : DEFAULT_SETTINGS.harvesterEnabled,
-      harvesterIntervalMs: typeof parsed.harvesterIntervalMs === "number" ? parsed.harvesterIntervalMs : DEFAULT_SETTINGS.harvesterIntervalMs,
+      harvestPrompt:
+        typeof parsed.harvestPrompt === "string" && parsed.harvestPrompt.trim()
+          ? parsed.harvestPrompt
+          : DEFAULT_SETTINGS.harvestPrompt,
     };
   } catch {
     return DEFAULT_SETTINGS;

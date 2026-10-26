@@ -5,7 +5,7 @@
   "category": "Utilities",
   "icon": "default",
   "entry": "dist/index.js",
-  "description": "Obsidian-style markdown notes with wikilinks, backlinks, and a background LLM-wiki harvester",
+  "description": "Obsidian-style markdown notes with wikilinks, backlinks, and an AI Harvest button",
   "apiVersion": "1",
-  "background": true
+  "background": false
 }

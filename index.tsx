@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { PluginContext, PluginApi } from "stewrd-plugin-api";
 import { Editor, trimTrailingBlank, type Palette } from "./editor";
 import { ReadingView } from "./ReadingView";
-import { Harvester } from "./harvester";
+import { initHarvester, isHarvesting, startHarvest, subscribeHarvesting } from "./harvester";
 import { loadNote, saveNote } from "./note";
 import { getStatus, setStatus, setViewing, subscribeStatus } from "./status";
 import { DEFAULT_SETTINGS, loadSettings, type NotepadSettings } from "./settings";
@@ -17,11 +17,11 @@ const PLUGIN_ID = "notepad";
 
 export function activate(ctx: PluginContext) {
   ctx.api.statusIcon.set("idle");
-  new Harvester(ctx).start();
+  initHarvester(ctx);
 }
 
 export function deactivate() {
-  // Harvester teardown is registered via ctx.onDispose in Harvester.start().
+  // Harvest teardown is registered per run via ctx.onDispose in startHarvest().
 }
 
 function toggleChecklistAt(content: string, index: number): string {
@@ -43,6 +43,7 @@ export function Component({ api }: { api: PluginApi }) {
   const [mode, setMode] = useState<Mode>(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState<NotepadSettings>(DEFAULT_SETTINGS);
   const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
+  const harvesting = useSyncExternalStore(subscribeHarvesting, isHarvesting);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const contentRef = useRef("");
   const scrollPosRef = useRef(0);
@@ -149,12 +150,9 @@ export function Component({ api }: { api: PluginApi }) {
     onChange("");
   }
 
-  async function handleShift() {
-    if (!content.trim()) return;
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    await api.fs.writeTextFile(`harvest/note-${timestamp}.md`, content.trimEnd());
-    onChange("");
-    api.toast.show({ message: "Moved to harvest folder", kind: "success" });
+  function handleHarvest() {
+    if (!content.trim() || isHarvesting()) return;
+    startHarvest(api, content, () => onChange(""));
   }
 
   async function handleCopy() {
@@ -192,8 +190,8 @@ export function Component({ api }: { api: PluginApi }) {
           <span title="Clear The Note">
             <api.ui.TextButton label="Clear" onClick={handleClear} disabled={!content.trim()} variant="secondary" />
           </span>
-          <span title="Move Note To Harvest Folder">
-            <api.ui.TextButton label="Shift" onClick={handleShift} disabled={!content.trim()} variant="secondary" />
+          <span title="Sends this note to the AI with your Harvest Prompt (Settings > Plugins > Configure), after masking anything that looks like a secret. The note is cleared right away.">
+            <api.ui.TextButton label="Harvest" onClick={handleHarvest} disabled={!content.trim() || harvesting} variant="secondary" />
           </span>
         </div>
       </div>
