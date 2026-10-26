@@ -31500,6 +31500,7 @@ ${redacted}
 
 ${settings.harvestPrompt}
 
+If you cannot do what is asked for any reason (for example you do not know how to save memories or have no tool for it), say so plainly and explain why before the final line. Do not pretend a memory was saved.
 End your reply with a final line \`MEMORIES_CREATED: <n>\` (the number of memories you saved).
 `;
     const handle = api.ai.run(prompt, {

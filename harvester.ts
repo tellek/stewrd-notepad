@@ -84,6 +84,8 @@ export async function startHarvest(api: PluginApi, text: string, onSaved: () => 
     const prompt =
       `${HEADER}\n\n--- NOTE CONTENT ---\n${redacted}\n--- END NOTE CONTENT ---\n\n` +
       `${settings.harvestPrompt}\n\n` +
+      "If you cannot do what is asked for any reason (for example you do not know how to save memories or have no tool for it), " +
+      "say so plainly and explain why before the final line. Do not pretend a memory was saved.\n" +
       "End your reply with a final line `MEMORIES_CREATED: <n>` (the number of memories you saved).\n";
 
     const handle = api.ai.run(prompt, {
