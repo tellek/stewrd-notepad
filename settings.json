@@ -3,5 +3,6 @@
   "version": "1.1.0",
   "defaultMode": "live-preview",
   "autosaveDebounceMs": 1000,
+  "aiEffort": "medium",
   "harvestPrompt": "Extract the durable lessons learned, facts, and decisions from the note below. Save each one as a separate memory using whatever memory tools or files you have available. If nothing is worth keeping, save nothing."
 }

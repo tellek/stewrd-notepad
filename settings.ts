@@ -10,6 +10,7 @@ export interface NotepadSettings {
   defaultMode: "source" | "live-preview" | "reading";
   autosaveDebounceMs: number;
   harvestPrompt: string;
+  aiEffort: "low" | "medium" | "high";
 }
 
 export const DEFAULT_HARVEST_PROMPT =
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: NotepadSettings = {
   defaultMode: "live-preview",
   autosaveDebounceMs: 1000,
   harvestPrompt: DEFAULT_HARVEST_PROMPT,
+  aiEffort: "medium",
 };
 
 export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
@@ -37,6 +39,10 @@ export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
         typeof parsed.harvestPrompt === "string" && parsed.harvestPrompt.trim()
           ? parsed.harvestPrompt
           : DEFAULT_SETTINGS.harvestPrompt,
+      aiEffort:
+        parsed.aiEffort === "low" || parsed.aiEffort === "medium" || parsed.aiEffort === "high"
+          ? parsed.aiEffort
+          : DEFAULT_SETTINGS.aiEffort,
     };
   } catch {
     return DEFAULT_SETTINGS;

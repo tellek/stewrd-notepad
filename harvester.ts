@@ -86,7 +86,9 @@ export async function startHarvest(api: PluginApi, text: string, onSaved: () => 
       "End your reply with a final line `MEMORIES_CREATED: <n>` (the number of memories you saved).\n\n" +
       `--- NOTE CONTENT ---\n${redacted}\n`;
 
-    const handle = api.ai.run(prompt, { onStderr: (chunk) => api.log.warn(`notepad harvest: ${chunk}`) });
+    const handle = api.ai.run(prompt, {
+      effort: settings.aiEffort,
+      onStderr: (chunk) => api.log.warn(`notepad harvest: ${chunk}`) });
     kill = () => handle.kill();
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<null>((resolve) => {

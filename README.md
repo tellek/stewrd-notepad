@@ -48,11 +48,14 @@ This plugin has no in-app settings UI — every option lives in its own
 {
   "defaultMode": "live-preview",
   "autosaveDebounceMs": 1000,
+  "aiEffort": "medium",
   "harvestPrompt": "Extract the durable lessons learned, facts, and decisions from the note below. Save each one as a separate memory using whatever memory tools or files you have available. If nothing is worth keeping, save nothing."
 }
 ```
 
-`harvestPrompt` is optional; the value above is the default.
+`harvestPrompt` is optional; the value above is the default. `aiEffort`
+(`low`, `medium` or `high`, default `medium`) sets how much power Harvest's AI
+run uses.
 
 ## Harvest
 
