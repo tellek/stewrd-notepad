@@ -14,10 +14,6 @@ let lastApi: PluginApi | undefined;
 let viewing = false;
 let resetTimer: ReturnType<typeof setTimeout> | undefined;
 
-export function getStatus(source: StatusSource): StatusColor {
-  return colors[source];
-}
-
 export function subscribeStatus(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -36,8 +32,13 @@ export function setViewing(value: boolean) {
   scheduleReset();
 }
 
+/** Highest-priority color across all sources: drives both the dot and the sidebar icon. */
+export function getWorstStatus(): StatusColor {
+  return Object.values(colors).reduce((a, b) => (PRIORITY.indexOf(b) > PRIORITY.indexOf(a) ? b : a), "idle" as StatusColor);
+}
+
 function publish(tooltip?: string) {
-  const worst = Object.values(colors).reduce((a, b) => (PRIORITY.indexOf(b) > PRIORITY.indexOf(a) ? b : a), "idle" as StatusColor);
+  const worst = getWorstStatus();
   try {
     lastApi?.statusIcon.set(worst, tooltip); // throws after deactivation/hot-reload
   } catch {

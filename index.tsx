@@ -5,7 +5,7 @@ import { Editor, trimTrailingBlank, type Palette } from "./editor";
 import { ReadingView } from "./ReadingView";
 import { initHarvester, isHarvesting, startHarvest, subscribeHarvesting } from "./harvester";
 import { loadNote, saveNote } from "./note";
-import { getStatus, setStatus, setViewing, subscribeStatus } from "./status";
+import { getWorstStatus, setStatus, setViewing, subscribeStatus } from "./status";
 import { DEFAULT_SETTINGS, loadSettings, type NotepadSettings } from "./settings";
 
 type Mode = "source" | "live-preview" | "reading";
@@ -42,7 +42,7 @@ export function Component({ api }: { api: PluginApi }) {
   const [savedTick, setSavedTick] = useState(0);
   const [mode, setMode] = useState<Mode>(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState<NotepadSettings>(DEFAULT_SETTINGS);
-  const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
+  const dotColor = useSyncExternalStore(subscribeStatus, getWorstStatus);
   const harvesting = useSyncExternalStore(subscribeHarvesting, isHarvesting);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const contentRef = useRef("");
@@ -183,7 +183,7 @@ export function Component({ api }: { api: PluginApi }) {
           onChange={(v) => setMode(v as Mode)}
         />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <api.ui.StatusDot color={saveState} />
+          <api.ui.StatusDot color={dotColor} />
           <span title="Copy Note To Clipboard">
             <api.ui.TextButton label="Copy" onClick={handleCopy} disabled={!content.trim()} variant="secondary" />
           </span>

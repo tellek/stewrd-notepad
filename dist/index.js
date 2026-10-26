@@ -31395,9 +31395,6 @@ var listeners = /* @__PURE__ */ new Set();
 var lastApi;
 var viewing = false;
 var resetTimer;
-function getStatus(source) {
-  return colors[source];
-}
 function subscribeStatus(fn) {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -31412,8 +31409,11 @@ function setViewing(value) {
   viewing = value;
   scheduleReset();
 }
+function getWorstStatus() {
+  return Object.values(colors).reduce((a, b) => PRIORITY.indexOf(b) > PRIORITY.indexOf(a) ? b : a, "idle");
+}
 function publish(tooltip) {
-  const worst = Object.values(colors).reduce((a, b) => PRIORITY.indexOf(b) > PRIORITY.indexOf(a) ? b : a, "idle");
+  const worst = getWorstStatus();
   try {
     lastApi?.statusIcon.set(worst, tooltip);
   } catch {
@@ -31583,7 +31583,7 @@ function Component({ api }) {
   const [savedTick, setSavedTick] = useState(0);
   const [mode, setMode] = useState(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
+  const dotColor = useSyncExternalStore(subscribeStatus, getWorstStatus);
   const harvesting = useSyncExternalStore(subscribeHarvesting, isHarvesting);
   const saveTimer = useRef2(void 0);
   const contentRef = useRef2("");
@@ -31698,7 +31698,7 @@ function Component({ api }) {
         }
       ),
       /* @__PURE__ */ jsxs2("div", { style: { display: "flex", alignItems: "center", gap: 8 }, children: [
-        /* @__PURE__ */ jsx4(api.ui.StatusDot, { color: saveState }),
+        /* @__PURE__ */ jsx4(api.ui.StatusDot, { color: dotColor }),
         /* @__PURE__ */ jsx4("span", { title: "Copy Note To Clipboard", children: /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Copy", onClick: handleCopy, disabled: !content2.trim(), variant: "secondary" }) }),
         /* @__PURE__ */ jsx4("span", { title: "Clear The Note", children: /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Clear", onClick: handleClear, disabled: !content2.trim(), variant: "secondary" }) }),
         /* @__PURE__ */ jsx4("span", { title: "Sends this note to the AI with your Harvest Prompt (Settings > Plugins > Configure), after masking anything that looks like a secret. The note is cleared right away.", children: /* @__PURE__ */ jsx4(api.ui.TextButton, { label: "Harvest", onClick: handleHarvest, disabled: !content2.trim() || harvesting, variant: "secondary" }) })
