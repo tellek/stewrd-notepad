@@ -3490,6 +3490,14 @@ function findColumn(string2, col, tabSize, strict) {
   return strict === true ? -1 : string2.length;
 }
 
+// padding.mjs
+function keepLength(text2, head) {
+  return Math.max(text2.trimEnd().length, head);
+}
+function restorePadLines(docLength, scrollPos, batch) {
+  return Math.max(0, scrollPos - docLength) + batch;
+}
+
 // node_modules/style-mod/src/style-mod.js
 var C = "\u037C";
 var COUNT = typeof Symbol == "undefined" ? "__" + C : Symbol.for(C);
@@ -25522,6 +25530,26 @@ function json() {
 // editor.tsx
 import { jsx as jsx2 } from "react/jsx-runtime";
 var paddingAnnotation = Annotation.define();
+var suppressDepth = 0;
+function suppressForTwoFrames() {
+  suppressDepth++;
+  let released = false;
+  let a = 0;
+  let b = 0;
+  const release = () => {
+    if (released) return;
+    released = true;
+    suppressDepth--;
+  };
+  a = requestAnimationFrame(() => {
+    b = requestAnimationFrame(release);
+  });
+  return () => {
+    cancelAnimationFrame(a);
+    cancelAnimationFrame(b);
+    release();
+  };
+}
 var CODE_LANGUAGES = [
   LanguageDescription.of({ name: "javascript", alias: ["js", "jsx", "ts", "tsx"], support: javascript() }),
   LanguageDescription.of({ name: "python", alias: ["py"], support: python() }),
@@ -25577,6 +25605,7 @@ var infiniteScroll = ViewPlugin.fromClass(
     view;
     onScroll = () => this.maybeGrow();
     maybeGrow() {
+      if (suppressDepth > 0) return;
       const el = this.view.scrollDOM;
       const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight);
       if (remaining > this.view.defaultLineHeight * (GROW_BATCH_LINES / 2)) return;
@@ -25600,6 +25629,7 @@ function scrollReporter(onPos) {
       }
       view;
       onScroll = () => {
+        if (suppressDepth > 0) return;
         const pos = this.view.lineBlockAtHeight(this.view.scrollDOM.scrollTop).from;
         onPos()?.(pos);
       };
@@ -25611,7 +25641,27 @@ function scrollReporter(onPos) {
 }
 function selectTrimmed(view) {
   view.dispatch({ selection: { anchor: 0, head: trimTrailingBlank(view.state.doc.toString()).length }, userEvent: "select" });
+  stripPadding(view);
   return true;
+}
+function stripPadding(view) {
+  if (!view) return false;
+  try {
+    const doc2 = view.state.doc;
+    const keep = keepLength(doc2.toString(), view.state.selection.main.head);
+    if (keep >= doc2.length) return false;
+    const el = view.scrollDOM;
+    const keptBottom = view.lineBlockAt(keep).bottom + view.documentTop - el.getBoundingClientRect().top + el.scrollTop;
+    if (el.scrollTop + el.clientHeight > keptBottom + window.innerHeight * 0.5) return false;
+    suppressForTwoFrames();
+    view.dispatch({
+      changes: { from: keep, to: doc2.length },
+      annotations: [paddingAnnotation.of(true), Transaction.addToHistory.of(false)]
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 function trimTrailingBlank(text2) {
   return text2.trimEnd();
@@ -25689,7 +25739,7 @@ function buildMarkDecorations(view) {
   );
   return deco;
 }
-function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos }) {
+function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, savedTick }) {
   const containerRef = useRef(null);
   const viewRef = useRef(null);
   const themeCompartment = useRef(new Compartment());
@@ -25733,11 +25783,26 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos 
     });
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    let releaseSuppress;
+    let restoreFrame = 0;
     if (initialScrollPos) {
-      const pos = Math.min(initialScrollPos, view.state.doc.length);
-      view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+      releaseSuppress = suppressForTwoFrames();
+      const pad = restorePadLines(view.state.doc.length, initialScrollPos, GROW_BATCH_LINES);
+      view.dispatch({
+        changes: { from: view.state.doc.length, insert: "\n".repeat(pad) },
+        annotations: [paddingAnnotation.of(true), Transaction.addToHistory.of(false)]
+      });
+      const restore = () => {
+        if (viewRef.current !== view) return;
+        const pos = Math.min(initialScrollPos, view.state.doc.length);
+        view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+      };
+      restore();
+      restoreFrame = requestAnimationFrame(restore);
     }
     return () => {
+      cancelAnimationFrame(restoreFrame);
+      releaseSuppress?.();
       view.destroy();
       viewRef.current = null;
     };
@@ -25746,10 +25811,13 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos 
     const view = viewRef.current;
     if (!view) return;
     const current = view.state.doc.toString();
-    if (current !== value) {
+    if (current !== value && !(current.startsWith(value) && !current.slice(value.length).trim())) {
       view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
     }
   }, [value]);
+  useEffect(() => {
+    if (savedTick) stripPadding(viewRef.current);
+  }, [savedTick]);
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
@@ -31515,6 +31583,7 @@ var SCROLL_SAVE_DEBOUNCE_MS = 500;
 function Component({ api }) {
   const [content2, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [savedTick, setSavedTick] = useState(0);
   const [mode, setMode] = useState(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
@@ -31546,7 +31615,7 @@ function Component({ api }) {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = void 0;
     setStatus(api, "save", "in-progress");
-    saveNote(api, value.trimEnd()).then(() => setStatus(api, "save", "success")).catch(() => setStatus(api, "save", "error", "save failed"));
+    saveNote(api, value.trimEnd()).then(() => setStatus(api, "save", "success")).catch(() => setStatus(api, "save", "error", "save failed")).then(() => setSavedTick((t2) => t2 + 1));
   }
   function onScrollPos(pos) {
     scrollPosRef.current = pos;
@@ -31628,7 +31697,8 @@ function Component({ api }) {
         mode: mode === "live-preview" ? "live-preview" : "source",
         palette,
         initialScrollPos: scrollPosRef.current,
-        onScrollPos
+        onScrollPos,
+        savedTick
       }
     ) })
   ] });

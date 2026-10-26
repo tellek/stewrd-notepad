@@ -2,7 +2,8 @@
 // extension seam and no markdown language, so this plugin bundles and owns
 // its own CodeMirror 6 instance instead.
 import { useEffect, useRef } from "react";
-import { EditorState, Compartment, Annotation, Prec, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, Annotation, Prec, Transaction, type Extension } from "@codemirror/state";
+import { keepLength, restorePadLines } from "./padding.mjs";
 import { EditorView, keymap, highlightActiveLine, Decoration, type DecorationSet, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentMore, indentLess, insertNewlineAndIndent } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
@@ -21,6 +22,30 @@ import { tags } from "@lezer/highlight";
 // infinite scroll) so the updateListener can skip firing onChange/save for
 // them - they're scaffolding for scrolling/clicking, not user edits.
 const paddingAnnotation = Annotation.define<boolean>();
+
+// While > 0, scroll reports and infinite-scroll growth are ignored so a scroll
+// restore or padding strip settling doesn't overwrite the saved position or
+// re-grow the document. One editor is mounted at a time, so module state is fine.
+let suppressDepth = 0;
+function suppressForTwoFrames(): () => void {
+  suppressDepth++;
+  let released = false;
+  let a = 0;
+  let b = 0;
+  const release = () => {
+    if (released) return;
+    released = true;
+    suppressDepth--;
+  };
+  a = requestAnimationFrame(() => {
+    b = requestAnimationFrame(release);
+  });
+  return () => {
+    cancelAnimationFrame(a);
+    cancelAnimationFrame(b);
+    release();
+  };
+}
 
 const CODE_LANGUAGES = [
   LanguageDescription.of({ name: "javascript", alias: ["js", "jsx", "ts", "tsx"], support: javascript() }),
@@ -100,6 +125,7 @@ const infiniteScroll = ViewPlugin.fromClass(
       view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
     }
     maybeGrow() {
+      if (suppressDepth > 0) return;
       const el = this.view.scrollDOM;
       const remaining = el.scrollHeight - (el.scrollTop + el.clientHeight);
       if (remaining > this.view.defaultLineHeight * (GROW_BATCH_LINES / 2)) return;
@@ -121,6 +147,7 @@ function scrollReporter(onPos: () => ((pos: number) => void) | undefined) {
   return ViewPlugin.fromClass(
     class {
       private onScroll = () => {
+        if (suppressDepth > 0) return;
         const pos = this.view.lineBlockAtHeight(this.view.scrollDOM.scrollTop).from;
         onPos()?.(pos);
       };
@@ -138,7 +165,31 @@ function scrollReporter(onPos: () => ((pos: number) => void) | undefined) {
  * trailing padding lines so they aren't copied. */
 function selectTrimmed(view: EditorView): boolean {
   view.dispatch({ selection: { anchor: 0, head: trimTrailingBlank(view.state.doc.toString()).length }, userEvent: "select" });
+  stripPadding(view);
   return true;
+}
+
+/** Removes trailing padding lines from the live buffer (never before the
+ * caret), but only when that can't shift the viewport - otherwise the browser
+ * clamps scrollTop and the view jumps. Returns whether it stripped. */
+export function stripPadding(view: EditorView | null): boolean {
+  if (!view) return false;
+  try {
+    const doc = view.state.doc;
+    const keep = keepLength(doc.toString(), view.state.selection.main.head);
+    if (keep >= doc.length) return false;
+    const el = view.scrollDOM;
+    const keptBottom = view.lineBlockAt(keep).bottom + view.documentTop - el.getBoundingClientRect().top + el.scrollTop;
+    if (el.scrollTop + el.clientHeight > keptBottom + window.innerHeight * 0.5) return false;
+    suppressForTwoFrames();
+    view.dispatch({
+      changes: { from: keep, to: doc.length },
+      annotations: [paddingAnnotation.of(true), Transaction.addToHistory.of(false)],
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function trimTrailingBlank(text: string): string {
@@ -226,9 +277,11 @@ export interface EditorProps {
   onCheckboxToggle?: (lineNumber: number) => void;
   initialScrollPos?: number;
   onScrollPos?: (pos: number) => void;
+  /** Bumped after each successful save; triggers a padding strip. */
+  savedTick?: number;
 }
 
-export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos }: EditorProps) {
+export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, savedTick }: EditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
@@ -276,11 +329,26 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
 
     const view = new EditorView({ state, parent: containerRef.current });
     viewRef.current = view;
+    let releaseSuppress: (() => void) | undefined;
+    let restoreFrame = 0;
     if (initialScrollPos) {
-      const pos = Math.min(initialScrollPos, view.state.doc.length);
-      view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+      releaseSuppress = suppressForTwoFrames();
+      const pad = restorePadLines(view.state.doc.length, initialScrollPos, GROW_BATCH_LINES);
+      view.dispatch({
+        changes: { from: view.state.doc.length, insert: "\n".repeat(pad) },
+        annotations: [paddingAnnotation.of(true), Transaction.addToHistory.of(false)],
+      });
+      const restore = () => {
+        if (viewRef.current !== view) return;
+        const pos = Math.min(initialScrollPos, view.state.doc.length);
+        view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start" }) });
+      };
+      restore();
+      restoreFrame = requestAnimationFrame(restore);
     }
     return () => {
+      cancelAnimationFrame(restoreFrame);
+      releaseSuppress?.();
       view.destroy();
       viewRef.current = null;
     };
@@ -291,10 +359,16 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
     const view = viewRef.current;
     if (!view) return;
     const current = view.state.doc.toString();
-    if (current !== value) {
+    // Padding lines may trail the doc (and `value`, once typed past) - only
+    // replace when the text itself differs.
+    if (current !== value && !(current.startsWith(value) && !current.slice(value.length).trim())) {
       view.dispatch({ changes: { from: 0, to: current.length, insert: value } });
     }
   }, [value]);
+
+  useEffect(() => {
+    if (savedTick) stripPadding(viewRef.current);
+  }, [savedTick]);
 
   useEffect(() => {
     const view = viewRef.current;

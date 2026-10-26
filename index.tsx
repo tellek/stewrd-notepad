@@ -39,6 +39,7 @@ const SCROLL_SAVE_DEBOUNCE_MS = 500;
 export function Component({ api }: { api: PluginApi }) {
   const [content, setContent] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [savedTick, setSavedTick] = useState(0);
   const [mode, setMode] = useState<Mode>(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState<NotepadSettings>(DEFAULT_SETTINGS);
   const saveState = useSyncExternalStore(subscribeStatus, () => getStatus("save"));
@@ -81,7 +82,8 @@ export function Component({ api }: { api: PluginApi }) {
     setStatus(api, "save", "in-progress");
     saveNote(api, value.trimEnd())
       .then(() => setStatus(api, "save", "success"))
-      .catch(() => setStatus(api, "save", "error", "save failed"));
+      .catch(() => setStatus(api, "save", "error", "save failed"))
+      .then(() => setSavedTick((t) => t + 1)); // separate step: a strip problem can't flip the save status
   }
 
   function onScrollPos(pos: number) {
@@ -185,6 +187,7 @@ export function Component({ api }: { api: PluginApi }) {
             palette={palette}
             initialScrollPos={scrollPosRef.current}
             onScrollPos={onScrollPos}
+            savedTick={savedTick}
           />
         )}
       </div>
