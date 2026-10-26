@@ -31459,7 +31459,8 @@ function changeRuns(delta) {
 }
 async function appendLog(api, file, outcome, detail) {
   try {
-    const old = await api.fs.readTextFile(LOG_PATH).catch(() => "");
+    const entries = await api.fs.listDir("harvest").catch(() => []);
+    const old = entries.some((e) => e.name === "harvest.log") ? await api.fs.readTextFile(LOG_PATH) : "";
     const entry = `[${(/* @__PURE__ */ new Date()).toISOString()}] ${file}: ${outcome}
 ${detail.trim()}
 

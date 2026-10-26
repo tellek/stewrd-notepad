@@ -40,7 +40,9 @@ function changeRuns(delta: number) {
 /** Appends one entry to harvest/harvest.log (api.fs has no append, so read then write). */
 async function appendLog(api: PluginApi, file: string, outcome: string, detail: string): Promise<void> {
   try {
-    const old = await api.fs.readTextFile(LOG_PATH).catch(() => "");
+    // Check the listing first: reading a missing file makes the host log an error.
+    const entries: { name: string }[] = await api.fs.listDir("harvest").catch(() => []);
+    const old = entries.some((e) => e.name === "harvest.log") ? await api.fs.readTextFile(LOG_PATH) : "";
     const entry = `[${new Date().toISOString()}] ${file}: ${outcome}\n${detail.trim()}\n\n`;
     await api.fs.writeTextFile(LOG_PATH, old + entry);
   } catch (err) {
