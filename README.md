@@ -80,4 +80,4 @@ Upgrading: add `harvestPrompt` to your `settings.json` if you want to change
 it, and delete the old `harvesterEnabled`/`harvesterIntervalMs` keys. Files
 left in `harvest/`, `processed/` and `wiki/` by the old Shift button and
 background wiki harvester are no longer processed and can be deleted.
-`build-release.bat` no longer overwrites an existing deployed `settings.json`.
+`build-release.bat` only adds new keys to an existing deployed `settings.json`; it never changes existing values.

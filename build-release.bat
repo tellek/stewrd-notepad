@@ -12,9 +12,9 @@ py package-zip.py notepad.zip || exit /b 1
 rem storage.json and data\ hold the plugin's runtime state in the deploy folder, so /MIR must not delete them.
 robocopy "%REPO%." "%DEPLOY%" /MIR /NFL /NDL /NJH /NP ^
   /XD .git .remember .serena node_modules data ^
-  /XF storage.json settings.json package.json package-lock.json build-release.bat package-zip.py CLAUDE.md ARCHITECTURE.md *.zip
+  /XF storage.json settings.json merge-settings.mjs package.json package-lock.json build-release.bat package-zip.py CLAUDE.md ARCHITECTURE.md *.zip
 if %ERRORLEVEL% GEQ 8 exit /b 1
-rem settings.json is excluded above so a deploy never resets the user's Harvest prompt; seed it on first deploy only.
-if not exist "%DEPLOY%\settings.json" copy "%REPO%settings.json" "%DEPLOY%\settings.json" >nul
+rem settings.json is excluded above so a deploy never overwrites user values; merge-settings.mjs adds only new keys.
+node merge-settings.mjs "%REPO%settings.json" "%DEPLOY%\settings.json" || exit /b 1
 echo Deployed to %DEPLOY%
 exit /b 0
