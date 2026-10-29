@@ -25866,23 +25866,19 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos,
     if (!view) return;
     view.dispatch({ effects: wrapCompartment.current.reconfigure(wordWrap ? EditorView.lineWrapping : []) });
   }, [wordWrap]);
-  return /* @__PURE__ */ jsx2(
+  return /* @__PURE__ */ jsx2("div", { style: { flex: 1, minWidth: 0, minHeight: 0, position: "relative" }, children: /* @__PURE__ */ jsx2(
     "div",
     {
       ref: containerRef,
       style: {
-        flex: 1,
-        minWidth: 0,
-        minHeight: 0,
-        height: "100%",
+        position: "absolute",
+        inset: 0,
         border: `1px solid ${palette.border}`,
         borderRadius: 4,
-        overflow: "hidden",
-        scrollbarWidth: "thin",
-        scrollbarColor: `${palette.border} ${palette.surface}`
+        overflow: "hidden"
       }
     }
-  );
+  ) });
 }
 function wrapSelection(view, marker) {
   const { from, to } = view.state.selection.main;
@@ -31711,7 +31707,7 @@ function Component({ api }) {
     onChange(toggleChecklistAt(content2, index));
   }
   if (!loaded) return /* @__PURE__ */ jsx4("p", { children: "Loading..." });
-  return /* @__PURE__ */ jsxs2("div", { style: { display: "flex", flexDirection: "column", height: "100%" }, children: [
+  return /* @__PURE__ */ jsxs2("div", { style: { display: "flex", flexDirection: "column", height: "100%", width: "100%", minWidth: 0 }, children: [
     /* @__PURE__ */ jsxs2("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }, children: [
       /* @__PURE__ */ jsx4(
         api.ui.Tabs,

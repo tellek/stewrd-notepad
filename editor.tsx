@@ -428,21 +428,21 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
     view.dispatch({ effects: wrapCompartment.current.reconfigure(wordWrap ? EditorView.lineWrapping : []) });
   }, [wordWrap]);
 
+  // Absolutely positioned inside a sized wrapper so a wide, unwrapped document
+  // can never widen the plugin layout; only the editor scrolls horizontally.
   return (
-    <div
-      ref={containerRef}
-      style={{
-        flex: 1,
-        minWidth: 0,
-        minHeight: 0,
-        height: "100%",
-        border: `1px solid ${palette.border}`,
-        borderRadius: 4,
-        overflow: "hidden",
-        scrollbarWidth: "thin",
-        scrollbarColor: `${palette.border} ${palette.surface}`,
-      }}
-    />
+    <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative" }}>
+      <div
+        ref={containerRef}
+        style={{
+          position: "absolute",
+          inset: 0,
+          border: `1px solid ${palette.border}`,
+          borderRadius: 4,
+          overflow: "hidden",
+        }}
+      />
+    </div>
   );
 }
 

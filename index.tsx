@@ -184,7 +184,7 @@ export function Component({ api }: { api: PluginApi }) {
   if (!loaded) return <p>Loading...</p>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%", minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <api.ui.Tabs
           tabs={[
