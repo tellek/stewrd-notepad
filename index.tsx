@@ -7,10 +7,10 @@ import { initHarvester, isHarvesting, startHarvest, subscribeHarvesting } from "
 import { loadNote, saveNote } from "./note";
 import { getWorstStatus, setStatus, setViewing, subscribeStatus } from "./status";
 import { DEFAULT_SETTINGS, loadSettings, type NotepadSettings } from "./settings";
-import copyIcon from "./assets/copy.svg";
-import clearIcon from "./assets/clear.svg";
-import harvestIcon from "./assets/harvest.svg";
-import wrapIcon from "./assets/wrap.svg";
+import copyIcon from "./assets/copy.png";
+import clearIcon from "./assets/clear.png";
+import harvestIcon from "./assets/harvest.png";
+import wrapIcon from "./assets/wrap.png";
 
 type Mode = "source" | "live-preview" | "reading";
 
@@ -196,10 +196,10 @@ export function Component({ api }: { api: PluginApi }) {
           onChange={(v) => setMode(v as Mode)}
         />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <api.ui.StatusDot color={dotColor} />
           <span title={wordWrap ? "Word Wrap: On" : "Word Wrap: Off"}>
             <api.ui.IconButton label="Word Wrap" icon={wrapIcon} accent={wordWrap} onClick={handleWrapToggle} />
           </span>
+          <api.ui.StatusDot color={dotColor} />
           <span title="Copy Note To Clipboard">
             <api.ui.IconButton label="Copy" icon={copyIcon} onClick={handleCopy} disabled={!content.trim()} />
           </span>

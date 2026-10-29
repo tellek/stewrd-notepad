@@ -12,7 +12,7 @@ Tabs at the top switch between:
 - **Live Preview** — same editor, but formatting marks (`**`, `*`, `` ` ``, `==`, `~~`) are hidden on every line except the one your cursor is on.
 - **Reading** — fully rendered, non-editable (checkboxes are still clickable here).
 
-Icon buttons **Word Wrap** (toggle, remembered), **Copy**, **Clear** and **Harvest** (each with a hover tooltip) sit on the same row
+Icon buttons **Word Wrap** (toggle, remembered, left of the status dot), **Copy**, **Clear** and **Harvest** (each with a hover tooltip) sit on the same row
 as the tabs, right-aligned. **Copy** puts the note on the clipboard without the
 trailing blank lines; Ctrl+A also skips them. Scroll position is remembered
 across tab switches and restarts, and the sidebar icon color follows the save dot.
