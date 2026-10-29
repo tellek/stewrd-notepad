@@ -211,7 +211,7 @@ export function Component({ api }: { api: PluginApi }) {
           </span>
         </div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, display: "flex", marginTop: 8 }}>
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", marginTop: 8 }}>
         {mode === "reading" ? (
           <ReadingView content={content} palette={palette} onChecklistToggle={handleChecklistToggle} />
         ) : (

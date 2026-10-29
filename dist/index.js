@@ -25557,7 +25557,7 @@ var CODE_LANGUAGES = [
 function themeExtension(palette) {
   return EditorView.theme(
     {
-      "&": { color: palette.text, backgroundColor: palette.background, height: "100%" },
+      "&": { color: palette.text, backgroundColor: palette.background, height: "100%", width: "100%", minWidth: 0 },
       // CodeMirror owns its own internal scroll container (.cm-scroller),
       // not the outer wrapper div - scrollbar styling has to land here to
       // actually apply, an outer-div style alone would have no effect.
@@ -25872,11 +25872,12 @@ function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos,
       ref: containerRef,
       style: {
         flex: 1,
+        minWidth: 0,
         minHeight: 0,
         height: "100%",
         border: `1px solid ${palette.border}`,
         borderRadius: 4,
-        overflow: "auto",
+        overflow: "hidden",
         scrollbarWidth: "thin",
         scrollbarColor: `${palette.border} ${palette.surface}`
       }
@@ -31732,7 +31733,7 @@ function Component({ api }) {
         /* @__PURE__ */ jsx4("span", { title: "Sends this note to the AI with your Harvest Prompt (Settings > Plugins > Configure), after masking anything that looks like a secret. The note is cleared right away.", children: /* @__PURE__ */ jsx4(api.ui.IconButton, { label: "Harvest", icon: harvest_default, onClick: handleHarvest, disabled: !content2.trim() || harvesting }) })
       ] })
     ] }),
-    /* @__PURE__ */ jsx4("div", { style: { flex: 1, minHeight: 0, display: "flex", marginTop: 8 }, children: mode === "reading" ? /* @__PURE__ */ jsx4(ReadingView, { content: content2, palette, onChecklistToggle: handleChecklistToggle }) : /* @__PURE__ */ jsx4(
+    /* @__PURE__ */ jsx4("div", { style: { flex: 1, minHeight: 0, minWidth: 0, display: "flex", marginTop: 8 }, children: mode === "reading" ? /* @__PURE__ */ jsx4(ReadingView, { content: content2, palette, onChecklistToggle: handleChecklistToggle }) : /* @__PURE__ */ jsx4(
       Editor,
       {
         value: content2,
