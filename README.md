@@ -18,6 +18,9 @@ trailing blank lines; Ctrl+A also skips them. Scroll position is remembered
 across tab switches and restarts, and the sidebar icon color follows the save dot.
 **Clear** empties the note. **Harvest** is described below.
 
+Ctrl+scroll wheel changes the font size (8-48px). A small indicator at the top
+right shows the direction and size with a **Reset** button; the size is saved.
+
 ## Markdown support
 
 Bold/italic/bold+italic, strikethrough, highlight (`==text==`), inline code,
