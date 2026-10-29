@@ -35,10 +35,6 @@ function toggleChecklistAt(content: string, index: number): string {
 }
 
 const SCROLL_SAVE_DEBOUNCE_MS = 500;
-const DEFAULT_FONT_SIZE = 16;
-const MIN_FONT_SIZE = 8;
-const MAX_FONT_SIZE = 48;
-const ZOOM_HIDE_MS = 2000;
 
 export function Component({ api }: { api: PluginApi }) {
   const [content, setContent] = useState("");
@@ -54,56 +50,16 @@ export function Component({ api }: { api: PluginApi }) {
   const cursorRef = useRef(0);
   const cursorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
-  const [zoomDir, setZoomDir] = useState<"up" | "down" | null>(null);
-  const [zoomHover, setZoomHover] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const fontSizeRef = useRef(DEFAULT_FONT_SIZE);
-  const zoomHideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const palette = api.theme.palette as Palette;
-
-  function applyFontSize(size: number, dir: "up" | "down") {
-    fontSizeRef.current = size;
-    setFontSize(size);
-    setZoomDir(dir);
-    api.storage.set("fontSize", size).catch(() => {});
-    if (zoomHideTimer.current) clearTimeout(zoomHideTimer.current);
-    zoomHideTimer.current = setTimeout(() => setZoomDir(null), ZOOM_HIDE_MS);
-  }
-
-  // Native non-passive listener: React's onWheel is passive and can't stop the
-  // host/browser from zooming the page on ctrl+wheel.
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey || e.deltaY === 0) return;
-      e.preventDefault();
-      const dir = e.deltaY < 0 ? "up" : "down";
-      const next = Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fontSizeRef.current + (dir === "up" ? 1 : -1)));
-      applyFontSize(next, dir);
-    };
-    el.addEventListener("wheel", onWheel, { passive: false, capture: true });
-    return () => {
-      el.removeEventListener("wheel", onWheel, { capture: true });
-      if (zoomHideTimer.current) clearTimeout(zoomHideTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded]);
 
   useEffect(() => {
     (async () => {
-      const [text, s, scrollPos, cursor, savedFont] = await Promise.all([
+      const [text, s, scrollPos, cursor] = await Promise.all([
         loadNote(api),
         loadSettings(PLUGIN_ID),
         api.storage.get<number>("scrollPos"),
         api.storage.get<number>("cursorPos"),
-        api.storage.get<number>("fontSize"),
       ]);
-      if (typeof savedFont === "number" && savedFont >= MIN_FONT_SIZE && savedFont <= MAX_FONT_SIZE) {
-        fontSizeRef.current = savedFont;
-        setFontSize(savedFont);
-      }
       scrollPosRef.current = scrollPos ?? 0;
       cursorRef.current = cursor ?? 0;
       setContent(text);
@@ -215,37 +171,7 @@ export function Component({ api }: { api: PluginApi }) {
   if (!loaded) return <p>Loading...</p>;
 
   return (
-    <div ref={rootRef} style={{ display: "flex", flexDirection: "column", height: "100%", position: "relative", fontSize }}>
-      {(zoomDir || zoomHover) && (
-        <div
-          onMouseEnter={() => setZoomHover(true)}
-          onMouseLeave={() => setZoomHover(false)}
-          style={{
-            position: "absolute",
-            top: 48,
-            right: 8,
-            zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "4px 8px",
-            fontSize: DEFAULT_FONT_SIZE,
-            background: palette.surface,
-            color: palette.text,
-            border: `1px solid ${palette.border}`,
-            borderRadius: 4,
-          }}
-        >
-          <span style={{ color: palette.accent }}>{zoomDir === "down" ? "▼" : "▲"}</span>
-          <span>{fontSize}px</span>
-          <api.ui.TextButton
-            label="Reset"
-            variant="secondary"
-            disabled={fontSize === DEFAULT_FONT_SIZE}
-            onClick={() => applyFontSize(DEFAULT_FONT_SIZE, "down")}
-          />
-        </div>
-      )}
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <api.ui.Tabs
           tabs={[
