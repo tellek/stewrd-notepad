@@ -303,14 +303,16 @@ export interface EditorProps {
   onCursor?: (pos: number) => void;
   /** Bumped after each successful save; triggers a padding strip. */
   savedTick?: number;
+  wordWrap?: boolean;
 }
 
-export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, initialCursor, onCursor, savedTick }: EditorProps) {
+export function Editor({ value, onChange, mode, palette, initialScrollPos, onScrollPos, initialCursor, onCursor, savedTick, wordWrap = true }: EditorProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
   const highlightCompartment = useRef(new Compartment());
   const modeCompartment = useRef(new Compartment());
+  const wrapCompartment = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onScrollPosRef = useRef(onScrollPos);
@@ -339,7 +341,7 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
         scrollReporter(() => onScrollPosRef.current),
         markdown({ base: markdownLanguage, codeLanguages: CODE_LANGUAGES }),
         highlightActiveLine(),
-        EditorView.lineWrapping,
+        wrapCompartment.current.of(wordWrap ? EditorView.lineWrapping : []),
         extendOnClickBelow,
         infiniteScroll,
         themeCompartment.current.of(themeExtension(palette)),
@@ -419,6 +421,12 @@ export function Editor({ value, onChange, mode, palette, initialScrollPos, onScr
       effects: modeCompartment.current.reconfigure(mode === "live-preview" ? [livePreviewMarks] : []),
     });
   }, [mode]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({ effects: wrapCompartment.current.reconfigure(wordWrap ? EditorView.lineWrapping : []) });
+  }, [wordWrap]);
 
   return (
     <div

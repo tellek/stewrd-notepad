@@ -7,6 +7,10 @@ import { initHarvester, isHarvesting, startHarvest, subscribeHarvesting } from "
 import { loadNote, saveNote } from "./note";
 import { getWorstStatus, setStatus, setViewing, subscribeStatus } from "./status";
 import { DEFAULT_SETTINGS, loadSettings, type NotepadSettings } from "./settings";
+import copyIcon from "./assets/copy.svg";
+import clearIcon from "./assets/clear.svg";
+import harvestIcon from "./assets/harvest.svg";
+import wrapIcon from "./assets/wrap.svg";
 
 type Mode = "source" | "live-preview" | "reading";
 
@@ -42,6 +46,7 @@ export function Component({ api }: { api: PluginApi }) {
   const [savedTick, setSavedTick] = useState(0);
   const [mode, setMode] = useState<Mode>(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState<NotepadSettings>(DEFAULT_SETTINGS);
+  const [wordWrap, setWordWrap] = useState(true);
   const dotColor = useSyncExternalStore(subscribeStatus, getWorstStatus);
   const harvesting = useSyncExternalStore(subscribeHarvesting, isHarvesting);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -54,12 +59,14 @@ export function Component({ api }: { api: PluginApi }) {
 
   useEffect(() => {
     (async () => {
-      const [text, s, scrollPos, cursor] = await Promise.all([
+      const [text, s, scrollPos, cursor, wrap] = await Promise.all([
         loadNote(api),
         loadSettings(PLUGIN_ID),
         api.storage.get<number>("scrollPos"),
         api.storage.get<number>("cursorPos"),
+        api.storage.get<boolean>("wordWrap"),
       ]);
+      setWordWrap(wrap ?? true);
       scrollPosRef.current = scrollPos ?? 0;
       cursorRef.current = cursor ?? 0;
       setContent(text);
@@ -155,6 +162,12 @@ export function Component({ api }: { api: PluginApi }) {
     startHarvest(api, content, () => onChange(""));
   }
 
+  function handleWrapToggle() {
+    const next = !wordWrap;
+    setWordWrap(next);
+    api.storage.set("wordWrap", next).catch(() => {});
+  }
+
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(trimTrailingBlank(content));
@@ -184,14 +197,17 @@ export function Component({ api }: { api: PluginApi }) {
         />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <api.ui.StatusDot color={dotColor} />
+          <span title={wordWrap ? "Word Wrap: On" : "Word Wrap: Off"}>
+            <api.ui.IconButton label="Word Wrap" icon={wrapIcon} accent={wordWrap} onClick={handleWrapToggle} />
+          </span>
           <span title="Copy Note To Clipboard">
-            <api.ui.TextButton label="Copy" onClick={handleCopy} disabled={!content.trim()} variant="secondary" />
+            <api.ui.IconButton label="Copy" icon={copyIcon} onClick={handleCopy} disabled={!content.trim()} />
           </span>
           <span title="Clear The Note">
-            <api.ui.TextButton label="Clear" onClick={handleClear} disabled={!content.trim()} variant="secondary" />
+            <api.ui.IconButton label="Clear" icon={clearIcon} onClick={handleClear} disabled={!content.trim()} />
           </span>
           <span title="Sends this note to the AI with your Harvest Prompt (Settings > Plugins > Configure), after masking anything that looks like a secret. The note is cleared right away.">
-            <api.ui.TextButton label="Harvest" onClick={handleHarvest} disabled={!content.trim() || harvesting} variant="secondary" />
+            <api.ui.IconButton label="Harvest" icon={harvestIcon} onClick={handleHarvest} disabled={!content.trim() || harvesting} />
           </span>
         </div>
       </div>
@@ -209,6 +225,7 @@ export function Component({ api }: { api: PluginApi }) {
             initialCursor={cursorRef.current}
             onCursor={onCursor}
             savedTick={savedTick}
+            wordWrap={wordWrap}
           />
         )}
       </div>
