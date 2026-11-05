@@ -27,9 +27,9 @@ export const WIKI_OUTPUT_INSTRUCTIONS =
 
 const WIKI_PROMPT_BUDGET = 24000;
 
-/** The wizard opens whenever `firstRun` is true; it sets it to false when finished. */
+/** The wizard opens whenever `launchWizard` is true; it sets it to false when finished. */
 export function needsWizard(settings) {
-  return settings.firstRun === true;
+  return settings.launchWizard === true;
 }
 
 /** Strips code fences and a leading "Here is..." line from an AI-generated prompt. Returns "" when nothing usable remains. */

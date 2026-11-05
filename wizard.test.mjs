@@ -14,10 +14,10 @@ import {
   relativeToRoot,
 } from "./wizard.mjs";
 
-test("needsWizard follows firstRun only", () => {
-  assert.equal(needsWizard({ firstRun: true, harvestPrompt: DEFAULT_HARVEST_PROMPT }), true);
-  assert.equal(needsWizard({ firstRun: true, harvestPrompt: "custom" }), true);
-  assert.equal(needsWizard({ firstRun: false, harvestPrompt: DEFAULT_HARVEST_PROMPT }), false);
+test("needsWizard follows launchWizard only", () => {
+  assert.equal(needsWizard({ launchWizard: true, harvestPrompt: DEFAULT_HARVEST_PROMPT }), true);
+  assert.equal(needsWizard({ launchWizard: true, harvestPrompt: "custom" }), true);
+  assert.equal(needsWizard({ launchWizard: false, harvestPrompt: DEFAULT_HARVEST_PROMPT }), false);
 });
 
 test("cleanGeneratedPrompt strips fences, preamble and rejects empty", () => {

@@ -76,8 +76,8 @@ export function HarvestWizard({
 
   const finish = (patch: Partial<NotepadSettings>) =>
     work(async () => {
-      await saveSettings(PLUGIN_ID, { ...patch, firstRun: false });
-      onFinished({ ...patch, firstRun: false });
+      await saveSettings(PLUGIN_ID, { ...patch, launchWizard: false });
+      onFinished({ ...patch, launchWizard: false });
     });
 
   function makePrompt(base: string, extra: string) {

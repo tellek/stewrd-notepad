@@ -82,8 +82,8 @@ it can miss unusual secrets or mask harmless text.
 
 ### First-Run Wizard
 
-While `firstRun` is `true`, clicking **Harvest** opens a wizard (it sets
-`firstRun` to `false` when finished) that asks whether you already have a
+While `launchWizard` is `true`, clicking **Harvest** opens a wizard (it sets
+`launchWizard` to `false` when finished) that asks whether you already have a
 memory system:
 
 - **Yes:** paste a prompt that makes your AI save something to memory. A low
@@ -99,8 +99,8 @@ memory system:
 - **No, skip it:** `enableHarvest` becomes `false` and the Harvest button is
   hidden.
 
-Settings added: `firstRun`, `enableHarvest`, `wikiFolder`. To run the wizard
-again set `enableHarvest` and `firstRun` to `true`.
+Settings added: `launchWizard`, `enableHarvest`, `wikiFolder`. To run the wizard
+again set `enableHarvest` and `launchWizard` to `true`.
 
 Upgrading: add `harvestPrompt` to your `settings.json` if you want to change
 it, and delete the old `harvesterEnabled`/`harvesterIntervalMs` keys. Files

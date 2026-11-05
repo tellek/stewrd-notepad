@@ -12,7 +12,7 @@ export interface NotepadSettings {
   autosaveDebounceMs: number;
   harvestPrompt: string;
   aiEffort: "low" | "medium" | "high";
-  firstRun: boolean;
+  launchWizard: boolean;
   enableHarvest: boolean;
   wikiFolder: string;
 }
@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS: NotepadSettings = {
   autosaveDebounceMs: 1000,
   harvestPrompt: DEFAULT_HARVEST_PROMPT,
   aiEffort: "medium",
-  firstRun: false,
+  launchWizard: false,
   enableHarvest: true,
   wikiFolder: "",
 };
@@ -55,7 +55,7 @@ export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
         parsed.aiEffort === "low" || parsed.aiEffort === "medium" || parsed.aiEffort === "high"
           ? parsed.aiEffort
           : DEFAULT_SETTINGS.aiEffort,
-      firstRun: parsed.firstRun === true,
+      launchWizard: parsed.launchWizard === true,
       enableHarvest: parsed.enableHarvest !== false,
       wikiFolder: typeof parsed.wikiFolder === "string" ? parsed.wikiFolder.trim() : "",
     };

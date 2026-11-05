@@ -31376,7 +31376,7 @@ var WIKI_SCHEMA_SUMMARY = "Wiki rules: raw notes are never edited. All knowledge
 var WIKI_OUTPUT_INSTRUCTIONS = "Do not use any tools and do not try to save anything yourself. Your reply is the ONLY output channel; the host app writes the files for you.\nReply with zero or more blocks in exactly this form:\n=== FILE: wiki/<name>.md ===\n<the full new content of that page>\nFor every page you change or create, also reply with `=== FILE: index.md ===` followed by the full updated index.\nThen a block `=== LOG ===` followed by one or two lines describing what was added.\nEnd with a final line `MEMORIES_CREATED: <n>` (the number of pages you created or changed). If nothing is worth keeping, reply with only that line set to 0 and one sentence explaining why.";
 var WIKI_PROMPT_BUDGET = 24e3;
 function needsWizard(settings) {
-  return settings.firstRun === true;
+  return settings.launchWizard === true;
 }
 function cleanGeneratedPrompt(text2) {
   let out = String(text2 ?? "").trim();
@@ -31515,7 +31515,7 @@ var DEFAULT_SETTINGS = {
   autosaveDebounceMs: 1e3,
   harvestPrompt: DEFAULT_HARVEST_PROMPT,
   aiEffort: "medium",
-  firstRun: false,
+  launchWizard: false,
   enableHarvest: true,
   wikiFolder: ""
 };
@@ -31533,7 +31533,7 @@ async function loadSettings(pluginId) {
       autosaveDebounceMs: typeof parsed.autosaveDebounceMs === "number" ? parsed.autosaveDebounceMs : DEFAULT_SETTINGS.autosaveDebounceMs,
       harvestPrompt: typeof parsed.harvestPrompt === "string" && parsed.harvestPrompt.trim() ? parsed.harvestPrompt : DEFAULT_SETTINGS.harvestPrompt,
       aiEffort: parsed.aiEffort === "low" || parsed.aiEffort === "medium" || parsed.aiEffort === "high" ? parsed.aiEffort : DEFAULT_SETTINGS.aiEffort,
-      firstRun: parsed.firstRun === true,
+      launchWizard: parsed.launchWizard === true,
       enableHarvest: parsed.enableHarvest !== false,
       wikiFolder: typeof parsed.wikiFolder === "string" ? parsed.wikiFolder.trim() : ""
     };
@@ -31924,8 +31924,8 @@ function HarvestWizard({
     }
   }
   const finish = (patch) => work(async () => {
-    await saveSettings(PLUGIN_ID, { ...patch, firstRun: false });
-    onFinished({ ...patch, firstRun: false });
+    await saveSettings(PLUGIN_ID, { ...patch, launchWizard: false });
+    onFinished({ ...patch, launchWizard: false });
   });
   function makePrompt(base3, extra) {
     return work(async () => {
