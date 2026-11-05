@@ -31752,6 +31752,17 @@ ${file.content}`, "append");
   setStatus(api, "harvester", warnings.length ? "warning" : "success", msg);
   api.log.info(msg);
 }
+async function parkFailed(api, path, reason) {
+  const name2 = path.split("/").pop() ?? path;
+  await api.fs.renameFile(path, `harvest/failed/${name2}`).catch(() => {
+  });
+  const logPath = "harvest/failed/failures.log";
+  const existing = await api.fs.readTextFile(logPath).catch(() => "");
+  const line = `${(/* @__PURE__ */ new Date()).toISOString()} | ${name2} | ${reason.replace(/\s+/g, " ").trim()}
+`;
+  await api.fs.writeTextFile(logPath, existing + line).catch(() => {
+  });
+}
 async function startHarvest(api, text2, onSaved) {
   changeRuns(1);
   const ctx = ctxRef;
@@ -31788,8 +31799,7 @@ async function startHarvest(api, text2, onSaved) {
   let kill;
   ctx.onDispose(() => {
     kill?.();
-    if (!finished) api.fs.renameFile(path, `harvest/failed/${path.split("/").pop()}`).catch(() => {
-    });
+    if (!finished) parkFailed(api, path, "Interrupted: the plugin was reloaded or Stewrd closed during the run");
   });
   setStatus(api, "harvester", "in-progress", "Harvesting of the notepad data has been started");
   api.log.info("Harvesting of the notepad data has been started");
@@ -31833,8 +31843,7 @@ End your reply with a final line \`MEMORIES_CREATED: <n>\` (the number of memori
   } catch (err) {
     finished = true;
     if (ctx.signal.aborted) return;
-    await api.fs.renameFile(path, `harvest/failed/${path.split("/").pop()}`).catch(() => {
-    });
+    await parkFailed(api, path, err instanceof Error ? err.message : String(err));
     if (ctx.signal.aborted) return;
     api.log.error(`notepad harvest failed: ${err}`);
     setStatus(api, "harvester", "error", "Harvest failed");

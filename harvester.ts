@@ -100,6 +100,16 @@ async function applyWikiReply(api: PluginApi, folder: string, reply: string, inc
   api.log.info(msg);
 }
 
+/** Moves the note to harvest/failed/ and appends the file name and reason to harvest/failed/failures.log. */
+async function parkFailed(api: PluginApi, path: string, reason: string) {
+  const name = path.split("/").pop() ?? path;
+  await api.fs.renameFile(path, `harvest/failed/${name}`).catch(() => {});
+  const logPath = "harvest/failed/failures.log";
+  const existing = await api.fs.readTextFile(logPath).catch(() => "");
+  const line = `${new Date().toISOString()} | ${name} | ${reason.replace(/\s+/g, " ").trim()}\n`;
+  await api.fs.writeTextFile(logPath, existing + line).catch(() => {});
+}
+
 /**
  * Starts a harvest of `text`. `onSaved` runs once the redacted copy is safely
  * on disk (the caller clears the note there). Resolves when the run ends.
@@ -144,7 +154,7 @@ export async function startHarvest(api: PluginApi, text: string, onSaved: () => 
   ctx.onDispose(() => {
     // Hot-reload or shutdown mid-run: stop the process and park the file.
     kill?.();
-    if (!finished) api.fs.renameFile(path, `harvest/failed/${path.split("/").pop()}`).catch(() => {});
+    if (!finished) parkFailed(api, path, "Interrupted: the plugin was reloaded or Stewrd closed during the run");
   });
 
   setStatus(api, "harvester", "in-progress", "Harvesting of the notepad data has been started");
@@ -188,7 +198,7 @@ export async function startHarvest(api: PluginApi, text: string, onSaved: () => 
   } catch (err) {
     finished = true;
     if (ctx.signal.aborted) return;
-    await api.fs.renameFile(path, `harvest/failed/${path.split("/").pop()}`).catch(() => {});
+    await parkFailed(api, path, err instanceof Error ? err.message : String(err));
     if (ctx.signal.aborted) return;
     api.log.error(`notepad harvest failed: ${err}`);
     setStatus(api, "harvester", "error", "Harvest failed");
