@@ -3,12 +3,12 @@
 // shows the highest-priority one (see CLAUDE.md "Status Color Rules").
 import type { PluginApi, StatusColor } from "stewrd-plugin-api";
 
-export type StatusSource = "save" | "harvester";
+export type StatusSource = "save" | "harvester" | "wizard";
 
 const PRIORITY: StatusColor[] = ["idle", "success", "in-progress", "warning", "error"];
 const SUCCESS_RESET_MS = 3000;
 
-const colors: Record<StatusSource, StatusColor> = { save: "idle", harvester: "idle" };
+const colors: Record<StatusSource, StatusColor> = { save: "idle", harvester: "idle", wizard: "idle" };
 const listeners = new Set<() => void>();
 let lastApi: PluginApi | undefined;
 let viewing = false;

@@ -5,25 +5,37 @@
 // host command (see src-tauri/src/commands/plugin_settings.rs) - reusing it
 // directly needs no host changes at all.
 import { invoke } from "@tauri-apps/api/core";
+import { DEFAULT_HARVEST_PROMPT } from "./wizard.mjs";
 
 export interface NotepadSettings {
   defaultMode: "source" | "live-preview" | "reading";
   autosaveDebounceMs: number;
   harvestPrompt: string;
   aiEffort: "low" | "medium" | "high";
+  firstRun: boolean;
+  enableHarvest: boolean;
+  wikiFolder: string;
 }
 
-export const DEFAULT_HARVEST_PROMPT =
-  "Extract the durable lessons learned, facts, and decisions from the note above. " +
-  "Save each one as a separate memory using whatever memory tools or files you have available. " +
-  "If nothing is worth keeping, save nothing.";
+// Lives in wizard.mjs so node --test can load it without Tauri.
+export { DEFAULT_HARVEST_PROMPT };
 
 export const DEFAULT_SETTINGS: NotepadSettings = {
   defaultMode: "live-preview",
   autosaveDebounceMs: 1000,
   harvestPrompt: DEFAULT_HARVEST_PROMPT,
   aiEffort: "medium",
+  firstRun: false,
+  enableHarvest: true,
+  wikiFolder: "",
 };
+
+/** Merges `patch` into the plugin's settings.json. Writing it hot-reloads the plugin, so call it once. */
+export async function saveSettings(pluginId: string, patch: Partial<NotepadSettings>): Promise<void> {
+  const raw = await invoke<string>("read_plugin_settings_file", { dir: pluginId });
+  const merged = { ...JSON.parse(raw), ...patch };
+  await invoke("write_plugin_settings_file", { dir: pluginId, contents: JSON.stringify(merged, null, 2) + "\n" });
+}
 
 export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
   try {
@@ -43,6 +55,9 @@ export async function loadSettings(pluginId: string): Promise<NotepadSettings> {
         parsed.aiEffort === "low" || parsed.aiEffort === "medium" || parsed.aiEffort === "high"
           ? parsed.aiEffort
           : DEFAULT_SETTINGS.aiEffort,
+      firstRun: parsed.firstRun === true,
+      enableHarvest: parsed.enableHarvest !== false,
+      wikiFolder: typeof parsed.wikiFolder === "string" ? parsed.wikiFolder.trim() : "",
     };
   } catch {
     return DEFAULT_SETTINGS;

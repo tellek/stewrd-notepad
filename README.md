@@ -80,6 +80,28 @@ values of `password`/`secret`/`token`/`api_key` style assignments, and long
 random-looking strings with `[REDACTED]`. It is pattern-based and lossy, so
 it can miss unusual secrets or mask harmless text.
 
+### First-Run Wizard
+
+The first time **Harvest** is clicked on a default install (`firstRun` is
+`true` and `harvestPrompt` is still the default), a wizard asks whether you
+already have a memory system:
+
+- **Yes:** paste a prompt that makes your AI save something to memory. A low
+  effort AI call merges it with the default prompt into your `harvestPrompt`.
+- **No, set one up:** pick a folder (typed path; the default is inside the
+  plugin and is deleted on uninstall, **Use Home Folder** suggests a permanent
+  one). The wizard creates an LLM wiki there (`CLAUDE.md` schema, `index.md`,
+  `log.md`, `raw/`, `wiki/`, following Karpathy's LLM Wiki pattern), generates
+  a wiki `harvestPrompt`, and shows rules to paste into your AI's global rules.
+  Harvest then asks the AI to return page contents and the plugin writes them
+  (`wiki/` pages, `index.md`, and an appended `log.md`), so it works with any
+  provider. Pages are never overwritten with truncated text.
+- **No, skip it:** `enableHarvest` becomes `false` and the Harvest button is
+  hidden.
+
+Settings added: `firstRun`, `enableHarvest`, `wikiFolder`. To run the wizard
+again set `enableHarvest` and `firstRun` to `true` and remove `harvestPrompt`.
+
 Upgrading: add `harvestPrompt` to your `settings.json` if you want to change
 it, and delete the old `harvesterEnabled`/`harvesterIntervalMs` keys. Files
 left in `harvest/`, `processed/` and `wiki/` by the old Shift button and

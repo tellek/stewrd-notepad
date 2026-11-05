@@ -7,6 +7,8 @@ import { initHarvester, isHarvesting, startHarvest, subscribeHarvesting } from "
 import { loadNote, saveNote } from "./note";
 import { getWorstStatus, setStatus, setViewing, subscribeStatus } from "./status";
 import { DEFAULT_SETTINGS, loadSettings, type NotepadSettings } from "./settings";
+import { HarvestWizard } from "./HarvestWizard";
+import { needsWizard } from "./wizard.mjs";
 import copyIcon from "./assets/copy.png";
 import clearIcon from "./assets/clear.png";
 import harvestIcon from "./assets/harvest.png";
@@ -47,6 +49,7 @@ export function Component({ api }: { api: PluginApi }) {
   const [mode, setMode] = useState<Mode>(DEFAULT_SETTINGS.defaultMode);
   const [settings, setSettings] = useState<NotepadSettings>(DEFAULT_SETTINGS);
   const [wordWrap, setWordWrap] = useState(true);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const dotColor = useSyncExternalStore(subscribeStatus, getWorstStatus);
   const harvesting = useSyncExternalStore(subscribeHarvesting, isHarvesting);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -158,6 +161,10 @@ export function Component({ api }: { api: PluginApi }) {
   }
 
   function handleHarvest() {
+    if (needsWizard(settings)) {
+      setWizardOpen(true);
+      return;
+    }
     if (!content.trim() || isHarvesting()) return;
     startHarvest(api, content, () => onChange(""));
   }
@@ -206,11 +213,28 @@ export function Component({ api }: { api: PluginApi }) {
           <span title="Clear The Note">
             <api.ui.IconButton label="Clear" icon={clearIcon} onClick={handleClear} disabled={!content.trim()} />
           </span>
-          <span title="Sends this note to the AI with your Harvest Prompt (Settings > Plugins > Configure), after masking anything that looks like a secret. The note is cleared right away.">
-            <api.ui.IconButton label="Harvest" icon={harvestIcon} onClick={handleHarvest} disabled={!content.trim() || harvesting} />
-          </span>
+          {settings.enableHarvest && (
+            <span title="Sends this note to the AI with your Harvest Prompt (Settings > Plugins > Configure), after masking anything that looks like a secret. The note is cleared right away.">
+              <api.ui.IconButton
+                label="Harvest"
+                icon={harvestIcon}
+                onClick={handleHarvest}
+                disabled={needsWizard(settings) ? false : !content.trim() || harvesting}
+              />
+            </span>
+          )}
         </div>
       </div>
+      {wizardOpen && (
+        <HarvestWizard
+          api={api}
+          onClose={() => setWizardOpen(false)}
+          onFinished={(patch) => {
+            setSettings((s) => ({ ...s, ...patch }));
+            setWizardOpen(false);
+          }}
+        />
+      )}
       <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: "flex", marginTop: 8 }}>
         {mode === "reading" ? (
           <ReadingView content={content} palette={palette} onChecklistToggle={handleChecklistToggle} />
