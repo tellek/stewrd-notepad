@@ -14,9 +14,9 @@ import {
   relativeToRoot,
 } from "./wizard.mjs";
 
-test("needsWizard only for firstRun with the default prompt", () => {
+test("needsWizard follows firstRun only", () => {
   assert.equal(needsWizard({ firstRun: true, harvestPrompt: DEFAULT_HARVEST_PROMPT }), true);
-  assert.equal(needsWizard({ firstRun: true, harvestPrompt: "custom" }), false);
+  assert.equal(needsWizard({ firstRun: true, harvestPrompt: "custom" }), true);
   assert.equal(needsWizard({ firstRun: false, harvestPrompt: DEFAULT_HARVEST_PROMPT }), false);
 });
 

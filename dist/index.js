@@ -31376,7 +31376,7 @@ var WIKI_SCHEMA_SUMMARY = "Wiki rules: raw notes are never edited. All knowledge
 var WIKI_OUTPUT_INSTRUCTIONS = "Do not use any tools and do not try to save anything yourself. Your reply is the ONLY output channel; the host app writes the files for you.\nReply with zero or more blocks in exactly this form:\n=== FILE: wiki/<name>.md ===\n<the full new content of that page>\nFor every page you change or create, also reply with `=== FILE: index.md ===` followed by the full updated index.\nThen a block `=== LOG ===` followed by one or two lines describing what was added.\nEnd with a final line `MEMORIES_CREATED: <n>` (the number of pages you created or changed). If nothing is worth keeping, reply with only that line set to 0 and one sentence explaining why.";
 var WIKI_PROMPT_BUDGET = 24e3;
 function needsWizard(settings) {
-  return settings.firstRun === true && settings.harvestPrompt === DEFAULT_HARVEST_PROMPT;
+  return settings.firstRun === true;
 }
 function cleanGeneratedPrompt(text2) {
   let out = String(text2 ?? "").trim();

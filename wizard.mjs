@@ -27,9 +27,9 @@ export const WIKI_OUTPUT_INSTRUCTIONS =
 
 const WIKI_PROMPT_BUDGET = 24000;
 
-/** The wizard opens only for a fresh default install; merged-in `firstRun: true` never interrupts a tuned prompt. */
+/** The wizard opens whenever `firstRun` is true; it sets it to false when finished. */
 export function needsWizard(settings) {
-  return settings.firstRun === true && settings.harvestPrompt === DEFAULT_HARVEST_PROMPT;
+  return settings.firstRun === true;
 }
 
 /** Strips code fences and a leading "Here is..." line from an AI-generated prompt. Returns "" when nothing usable remains. */
