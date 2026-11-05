@@ -160,12 +160,23 @@ export function Component({ api }: { api: PluginApi }) {
     onChange("");
   }
 
-  function handleHarvest() {
+  async function handleHarvest() {
     if (needsWizard(settings)) {
       setWizardOpen(true);
       return;
     }
     if (!content.trim() || isHarvesting()) return;
+    const confirmed = await api.modal.confirm({
+      title: "Harvest This Note?",
+      message:
+        "This will mask anything that looks like a secret, save a copy of the note to the harvest folder, and clear the note right away. " +
+        "The masked note is then sent to your AI with your Harvest Prompt" +
+        (settings.wikiFolder ? ", and the AI's answer is written into your memory wiki" : "") +
+        ". The note is not restored afterwards.",
+      confirmLabel: "Harvest",
+      cancelLabel: "Cancel",
+    });
+    if (!confirmed || isHarvesting()) return;
     startHarvest(api, content, () => onChange(""));
   }
 
